@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ef">
+  <meta name="description" content="A quiet place for your next move. Play chess with Cristopher or a friend.">
+  <title>Cristopher — A game of thought</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Cristopher Chess home"><span class="brand-mark" aria-hidden="true">♞</span><span>cristopher<span class="brand-dot">.</span></span></a>
+    <span class="header-caption">A GAME OF THOUGHT</span>
+    <button id="sound-button" class="icon-button" aria-label="Mute sounds" aria-pressed="false" title="Mute sounds">♪</button>
+  </header>
+
+  <main class="workspace">
+    <section class="play-area" aria-label="Chess game">
+      <div class="section-heading"><span class="eyebrow">THE CHESS ROOM</span><span class="room-label"><span class="small-dot"></span> Unrated · Take your time</span></div>
+      <div class="player-strip" id="top-player"><div class="avatar" aria-hidden="true">C</div><div class="player-details"><strong class="player-name">Cristopher</strong><span class="player-description">Your thinking partner</span></div><span class="player-color">BLACK</span></div>
+      <div class="board-frame"><div id="board" class="board" role="group" aria-label="Chess board. Use arrow keys to navigate and Enter to select."></div></div>
+      <div class="player-strip" id="bottom-player"><div class="avatar human-avatar" aria-hidden="true">Y</div><div class="player-details"><strong class="player-name">You</strong><span class="player-description">Make yourself at home</span></div><span class="player-color">WHITE</span></div>
+      <p class="board-hint">A little patience. A little possibility. <span>Click or drag a piece to move.</span></p>
+    </section>
+
+    <aside class="game-panel" aria-label="Game information and controls">
+      <div class="panel-intro"><span class="eyebrow">MAKE YOUR MOVE</span><h1>Good things<br>take thought.</h1><p>Settle in. The board is yours.</p></div>
+      <section class="status-card" aria-label="Game status"><div class="status-icon" id="status-icon" aria-hidden="true">♔</div><div><h2 id="game-status" role="status" aria-live="polite">White to move</h2><p id="status-detail">Every game starts with a possibility.</p></div><span id="thinking" class="thinking" aria-label="Cristopher is thinking" hidden><i></i><i></i><i></i></span></section>
+      <div id="ai-error" class="error-message" role="alert" hidden><p id="error-text"></p><button id="retry-button" class="text-button">Retry move <span aria-hidden="true">↻</span></button></div>
+      <section class="moves-section" aria-label="Move history"><div class="panel-section-title"><h2>Moves</h2><span id="move-count">0 played</span></div><div class="move-columns" aria-hidden="true"><span>#</span><span>WHITE</span><span>BLACK</span></div><div id="move-scroll" class="move-scroll" tabindex="0" aria-label="Scrollable move history"><p id="empty-moves">A blank page.<br><span>Your first move starts the story.</span></p><table class="move-table" aria-label="Moves in standard algebraic notation"><thead class="sr-only"><tr><th scope="col">Move</th><th scope="col">White</th><th scope="col">Black</th></tr></thead><tbody id="move-list"></tbody></table></div></section>
+      <section class="captures-section" aria-label="Captured pieces"><div class="panel-section-title"><h2>Off the board</h2><span>CAPTURED</span></div><div class="capture-row"><span>By White</span><div id="white-captures" class="captured-pieces"></div><strong id="white-material"></strong></div><div class="capture-row"><span>By Black</span><div id="black-captures" class="captured-pieces"></div><strong id="black-material"></strong></div></section>
+      <div class="controls"><button id="new-game-button" class="primary-button"><span aria-hidden="true">＋</span> New game</button><div class="secondary-controls"><button id="undo-button" aria-label="Undo your move and Cristopher's reply"><span aria-hidden="true">↶</span> Undo</button><button id="flip-button" aria-label="Flip board orientation"><span aria-hidden="true">⇅</span> Flip board</button><button id="resign-button" aria-label="Resign the game"><span aria-hidden="true">⚑</span> Resign</button></div></div>
+      <div class="connection-row"><span id="connection" class="connection" role="status"><i></i><span>Connection · Local placeholder</span></span><span id="difficulty-label">Medium</span></div>
+    </aside>
+  </main>
+  <footer class="site-footer"><span>64 squares. Endless possibilities.</span><span>Made for the love of the game <span aria-hidden="true">↗</span></span></footer>
+
+  <dialog id="new-game-dialog" aria-labelledby="new-game-title"><form id="new-game-form"><div class="dialog-heading"><span class="eyebrow">A FRESH PERSPECTIVE</span><button type="button" class="close-button" data-close="new-game-dialog" aria-label="Close new game options">×</button></div><h2 id="new-game-title">Your next game.</h2><p>Find your side of the board.</p><fieldset><legend>Play as</legend><div class="choice-row"><label><input type="radio" name="color" value="w" checked><span>♔ White</span></label><label><input type="radio" name="color" value="b"><span>♚ Black</span></label><label><input type="radio" name="color" value="random"><span>⇄ Random</span></label></div></fieldset><label class="field-label" for="opponent">Opponent</label><select id="opponent" name="opponent"><option value="ai">Cristopher (AI)</option><option value="local">Local 2 players</option></select><label class="field-label" for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select><p class="form-note" id="difficulty-note">Cristopher plays random legal moves for now. Difficulty is saved for the future AI.</p><button type="submit" class="primary-button">Start playing <span aria-hidden="true">→</span></button></form></dialog>
+  <dialog id="promotion-dialog" aria-labelledby="promotion-title"><span class="eyebrow">A WELL-EARNED UPGRADE</span><h2 id="promotion-title">Choose your piece.</h2><p>Your pawn has reached the other side.</p><div id="promotion-options" class="promotion-options"></div><button id="cancel-promotion" class="text-button">Cancel move</button></dialog>
+  <dialog id="resign-dialog" aria-labelledby="resign-title"><span class="eyebrow">UNTIL THE NEXT GAME</span><h2 id="resign-title">Ready to resign?</h2><p id="resign-description">Your opponent will win this game.</p><div class="dialog-actions"><button class="secondary-button" data-close="resign-dialog">Keep playing</button><button id="confirm-resign" class="primary-button">Resign game</button></div></dialog>
+  <div id="startup-error" class="startup-message" role="alert" hidden>Start a local server from this folder with <code>python3 -m http.server 8080</code>, then visit <a href="http://localhost:8080">localhost:8080</a>. Browsers require a server to load JavaScript modules.</div>
+  <noscript><p class="startup-message">Enable JavaScript to play chess.</p></noscript>
+  <script>if (location.protocol === 'file:') document.getElementById('startup-error').hidden = false;</script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
