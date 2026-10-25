@@ -14,37 +14,53 @@ Open **http://localhost:8080**. On systems where Python is named `python`, use `
 
 Use a static server because browsers block local ES module imports under `file://`. Double-clicking `index.html` displays a setup hint. Any static HTTP server works; Python is only one option.
 
-The pinned chess.js **1.4.0** rules engine and all SVG pieces are vendored locally. Google Fonts is optional; system fonts take over offline. Gameplay does not require an internet connection in placeholder mode.
+The pinned chess.js **1.4.0** rules engine and all SVG pieces are vendored locally. The interface uses system fonts and original inline SVG icons. Gameplay and the entire interface work offline in placeholder mode.
 
 ## Play
 
 - Click a piece and then a highlighted destination, or drag it with a mouse or touch. Empty legal destinations have dots; captures have rings. The last move and a king in check are highlighted.
 - Keyboard: Tab to the board, use arrow keys to navigate, and Enter/Space to select and move. Escape clears selection or dismisses a dialog. Promotion requires choosing Queen, Rook, Bishop, or Knight; canceling leaves the pawn in place.
-- **New game:** White, Black, or Random; Cristopher (AI) or Local 2 players; Easy, Medium, or Hard. Black starts at the bottom when selected. Difficulty is passed to the AI module but does not affect the random placeholder.
-- **Undo:** in AI mode, removes your last move and the AI reply, or just your move if a reply is pending. A human playing Black keeps the AI's opening move. In local mode, removes one half-move. Undo is available after checkmate or a draw, but resignation is final.
+- **New Game tab:** White, Random, or Black; Cristopher (AI) or Local 2 players; Easy, Medium, or Hard; No clock, 3+0, 5+0, or 10+0. Press **Play** to start. Black starts at the bottom when selected. Difficulty is passed to the unchanged AI module but does not affect the random placeholder.
+- **Undo:** in AI mode, removes your last move and the AI reply, or just your move if a reply is pending. A human playing Black keeps the AI's opening move. In local mode, removes one half-move. Recorded clock times are restored to the position being restored. Undo is available after checkmate or a rules-based draw; resignation, agreed draw, and timeout are final.
 - **Flip board:** changes perspective without changing sides. Local play keeps this perspective between turns.
 - **Resign:** asks for confirmation. In AI mode, the human resigns; in local mode, the side to move resigns.
-- The note button toggles short WebAudio move, capture, and check sounds. Audio starts after an interaction, subject to browser autoplay restrictions.
-- The side panel displays SAN history, captured pieces by the capturing side, and material advantage. Pawn = 1, knight/bishop = 3, rook = 5, queen = 9; promotions count toward the live material balance.
+- **Settings:** open the gear icon or mobile **Menu**. Choose Green, Brown, or Blue board colors; toggle sound, coordinates, legal destinations, or move highlights. Settings persist in localStorage when available. The Cburnett piece set remains the single local set; check indicators remain visible when move highlights are off.
+- **Sounds:** distinct WebAudio sequences for moves, captures, checks, castling, promotions, and game end. Audio starts after an interaction, subject to browser autoplay restrictions.
+- **Game tab:** clickable SAN history and first/previous/next/last controls. Reviewing uses a separate chess.js position; it cannot alter the live game. **Back to live** restores play. AI replies and clocks continue during review and while settings are open.
+- Player bars show captured pieces by the capturing side and material advantage. Pawn = 1, knight/bishop = 3, rook = 5, queen = 9; promotions count toward the material balance. During review, captures reflect the reviewed position.
+- **Clocks:** 10 minutes by default, with no increment. The active side counts down; reaching zero ends the game as a loss on time. The timer uses elapsed time rather than counting interval callbacks, so background tab throttling does not grant extra time. Clocks continue during promotion and API retries. No clock mode disables timeouts.
+- **Game over:** a result card appears over the board, with New Game, Rematch, and close controls. Rematch reuses the current color, opponent, difficulty, and time control. Local players can offer and accept a draw; draw offers are disabled against Cristopher.
 
-All legality comes from chess.js, including castling, en passant, promotion, check, and checkmate. Stalemate, threefold repetition, insufficient material, and the 50-move rule end the game automatically, with a specific draw reason. Board input is locked during the AI turn or after the game ends. Pending replies cannot change a board after New Game, Undo, or Resign.
+All legality comes from the unchanged chess.js integration, including castling, en passant, promotion, check, and checkmate. Stalemate, threefold repetition, insufficient material, and the 50-move rule end the game automatically, with a specific draw reason. Board input is locked during the AI turn, history review, or after the game ends. Pending replies cannot change a board after New Game, Undo, Resign, or timeout.
+
+Desktop uses a slim navigation rail, board, and tabbed side panel. At 600–999px the panel moves below the board. Under 600px the board fills the screen width and a fixed action bar provides Undo, Flip, Resign, and Menu. Piece movement and snap-back animations respect reduced-motion preferences. Promotion opens a vertical picker on its destination file; clicking outside or pressing Escape cancels.
 
 ## Project structure
 
 ```text
 chess-cristopher/
   index.html
-  css/style.css
+  css/variables.css     Design tokens, themes, base styles
+  css/layout.css        Desktop/tablet/mobile layout and player bars
+  css/board.css         Board, highlights, promotion, result overlay
+  css/components.css    Controls, settings, move list, dialogs
   js/main.js             UI, central game state, game flow, audio
   js/board.js            Rendering, click/touch/drag, keyboard navigation
   js/game.js             Status, UCI formatting, material display, undo helpers
   js/cristopher.js       Random placeholder, API requests, response validation
   js/config.js          API configuration
+  js/ui/clock.js        Elapsed-time clock and formatting
+  js/ui/settings.js     Saved appearance and sound preferences
+  js/ui/moveList.js     Clickable move history
+  js/ui/panels.js       Tabs and popup positioning
+  js/ui/icons.js        Original avatar SVG helpers
+  js/ui/sounds.js       WebAudio note sequences
   assets/pieces/        Local SVG pieces, attribution, license
   vendor/chess.js       chess.js 1.4.0, browser ES module
   vendor/LICENSE-chess.js
   tests/index.html      Browser regression runner
   tests/tests.js
+  LICENSES.md           Asset sources and licenses
   README.md
 ```
 
@@ -116,9 +132,9 @@ Successful response:
 
 With the static server running, open **http://localhost:8080/tests/**. This dependency-free browser runner checks rule scenarios, real UI interactions in an iframe, and mocked API requests. It does not connect to a real AI server. Each check reports pass/fail.
 
-Validated in Chrome: all 20 browser checks pass. Separate browser input checks passed for mouse dragging, illegal-drop rejection, Enter-key moves, and touch dragging at 375px width. Desktop and mobile screenshots were inspected; the mobile page and New Game dialog fit without horizontal overflow. Other browsers and physical mobile devices have not been tested.
+Validated in Chrome: all 25 browser checks pass. Separate browser checks passed for mouse dragging, illegal snap-back, move/castling animations (both king and rook), actual stalemate and clock-timeout result overlays, and touch dragging at 390px width. Desktop and mobile screenshots were inspected; the page, vertical promotion picker, and Settings dialog fit without horizontal overflow. Other browsers and physical mobile devices have not been tested.
 
-Coverage includes Scholar's mate; castling both ways for both colors and rejection through check; en passant; all promotion choices and cancellation; stalemate, repetition, insufficient material, and 50-move draws; SAN and capture rendering; keyboard navigation; automatic Black orientation; completed and pending AI undo; stale replies after New Game and resignation; API contract, headers, illegal replies, HTTP/network/JSON errors, timeouts, health, and Retry.
+Coverage includes Scholar's mate; castling both ways for both colors and rejection through check; en passant; all promotion choices and cancellation; stalemate, repetition, insufficient material, and 50-move draws; SAN and capture rendering; keyboard navigation; automatic Black orientation; completed and pending AI undo; stale replies after New Game and resignation; API contract, headers, illegal replies, HTTP/network/JSON errors, timeouts, health, and Retry. The redesign adds checks for history review/live restoration, saved themes and display preferences, clock switching/restoration/timeout, no-clock mode, result cards, rematches, and local draw agreement.
 
 Useful manual scenarios (choose **Local 2 players**):
 
@@ -131,7 +147,9 @@ Useful manual scenarios (choose **Local 2 players**):
 | Promotion | `1. a4 h5 2. a5 h4 3. a6 h3 4. axb7 hxg2 5. bxa8`; picker opens. Cancel, retry, and choose each piece using Undo between attempts. |
 | Stalemate | The browser runner verifies `7k/5Q2/6K1/8/8/8/8/8 b - - 0 1` reports “Game drawn / Stalemate.” |
 | AI undo | Make a move, wait for Cristopher, then Undo; both moves disappear. Repeat and Undo while “thinking…” is visible; no delayed move should appear. |
-| Mobile / keyboard | At 375px width, check no horizontal overflow, tap and touch-drag moves, open the promotion picker; Tab to board and use arrows plus Enter. |
+| History | After a few moves, click an earlier SAN move; the board is read-only and the live move count is unchanged. Use the arrows and Back to live. |
+| Clock | Select 3+0, verify that only the moving side counts down, and leave it to expire; the opponent wins on time. No clock shows ∞ and never flags. |
+| Mobile / keyboard | At 390px width, check no horizontal overflow, tap and touch-drag moves, open the promotion picker and cancel outside; Tab to board and use arrows plus Enter. |
 
 The actual Python API is outside Phase 1; API behavior is verified with browser-side mock responses, including failures.
 
@@ -139,4 +157,4 @@ The actual Python API is outside Phase 1; API behavior is verified with browser-
 
 - [chess.js 1.4.0](https://github.com/jhlywa/chess.js/tree/v1.4.0), Jeff Hlywa and contributors, BSD-2-Clause; local license in `vendor/LICENSE-chess.js`.
 - Cburnett SVG chess pieces by Colin M. Burnett, GPL-2.0-or-later, sourced unchanged from Lichess; attribution and full license in `assets/pieces/`.
-- Optional DM Sans and Playfair Display served by Google Fonts; fallbacks use system sans-serif and Georgia.
+- All UI icons and avatars are original inline SVG; sounds are generated with WebAudio and fonts are system fonts. See [LICENSES.md](LICENSES.md). No Chess.com proprietary assets are used.

@@ -2,6 +2,7 @@ import { Chess } from '../vendor/chess.js';
 import { CONFIG } from '../js/config.js';
 import { getCristopherMove, checkCristopherHealth } from '../js/cristopher.js';
 import { gameStatus, materialSummary, toUci, undoTurn } from '../js/game.js';
+import { ChessClock, formatTime } from '../js/ui/clock.js';
 
 const results = [];
 const assert = (condition, message = 'Assertion failed') => { if (!condition) throw new Error(message); };
@@ -233,6 +234,91 @@ await test('UI API failure preserves board, Retry succeeds, resignation invalida
   newGame('ai'); move('e2','e4'); click('resign-button'); click('confirm-resign'); await sleep(900);
   assert(doc.getElementById('game-status').textContent === 'Black wins');
   assert(doc.getElementById('move-count').textContent === '1 played');
+});
+await test('History review is read-only, preserves the live position, and returns to live', () => {
+  newGame('local');
+  [['e2','e4'],['e7','e5'],['g1','f3'],['b8','c6']].forEach(([from,to]) => move(from,to));
+  doc.querySelector('[data-ply="1"]').click();
+  assert(!doc.getElementById('review-indicator').hidden);
+  assert(square('e7').querySelector('img') && !square('e5').querySelector('img'));
+  assert(doc.getElementById('board').classList.contains('input-locked'));
+  move('d7','d5');
+  assert(doc.getElementById('move-count').textContent === '4 played');
+  click('history-first'); assert(square('e2').querySelector('img'));
+  click('history-next'); assert(square('e4').querySelector('img'));
+  click('back-to-live');
+  assert(square('c6').querySelector('img') && square('f3').querySelector('img'));
+  assert(doc.getElementById('review-indicator').hidden);
+  assert(!doc.getElementById('board').classList.contains('input-locked'));
+});
+await test('Settings apply board themes and display preferences and persist them', async () => {
+  const originalStorage = frame.contentWindow.localStorage.getItem('cristopher.settings.v1');
+  const originalTheme = doc.documentElement.dataset.boardTheme;
+  const ids = ['coordinates-toggle', 'legal-toggle', 'highlights-toggle'];
+  const originalValues = ids.map(id => doc.getElementById(id).checked);
+  click('board-settings-button');
+  try {
+    doc.querySelector('[name="board-theme"][value="blue"]').click();
+    assert(doc.documentElement.dataset.boardTheme === 'blue');
+    ids.forEach(id => { if (doc.getElementById(id).checked) doc.getElementById(id).click(); });
+    assert(doc.documentElement.classList.contains('no-coordinates'));
+    assert(doc.documentElement.classList.contains('no-legal-moves'));
+    assert(doc.documentElement.classList.contains('no-highlights'));
+    const saved = JSON.parse(frame.contentWindow.localStorage.getItem('cristopher.settings.v1'));
+    assert(saved.theme === 'blue' && !saved.coordinates && !saved.legalMoves && !saved.highlights);
+  } finally {
+    doc.querySelector(`[name="board-theme"][value="${originalTheme}"]`).click();
+    ids.forEach((id, index) => { if (doc.getElementById(id).checked !== originalValues[index]) doc.getElementById(id).click(); });
+    if (originalStorage === null) frame.contentWindow.localStorage.removeItem('cristopher.settings.v1');
+    else frame.contentWindow.localStorage.setItem('cristopher.settings.v1', originalStorage);
+    doc.querySelector('[data-close="settings-dialog"]').click();
+  }
+});
+await test('Clock deducts elapsed time, switches turns, restores undo, and flags only once', () => {
+  let now = 0;
+  const flagged = [];
+  const timer = new ChessClock(() => {}, color => flagged.push(color), () => now);
+  try {
+    timer.start(180);
+    now = 1234; timer.tick();
+    assert(timer.value().remaining.w === 178766 && timer.value().remaining.b === 180000);
+    timer.switchTurn('b');
+    const snapshot = timer.snapshot();
+    now = 3234; timer.tick(); assert(timer.value().remaining.b === 178000);
+    timer.restore(snapshot, 'b'); assert(timer.value().remaining.b === 180000);
+    now += 200000; timer.tick(); timer.tick();
+    assert(flagged.join('') === 'b' && timer.value().remaining.b === 0);
+    assert(formatTime(1) === '0:01' && formatTime(600000) === '10:00');
+    timer.start(0); now += 900000; timer.tick(); assert(timer.value().active === null);
+  } finally { timer.destroy(); }
+});
+await test('Game result closes, rematches with the same settings, and local draw is agreed', () => {
+  newGame('local');
+  [['e2','e4'],['e7','e5'],['f1','c4'],['b8','c6'],['d1','h5'],['g8','f6'],['h5','f7']].forEach(([from,to]) => move(from,to));
+  assert(!doc.getElementById('result-layer').hidden);
+  assert(doc.getElementById('result-title').textContent === 'White won');
+  assert(doc.getElementById('result-detail').textContent.includes('Checkmate'));
+  click('close-result'); assert(doc.getElementById('result-layer').hidden);
+  click('undo-button'); assert(!doc.getElementById('board').classList.contains('input-locked'));
+  move('h5','f7'); click('rematch-button');
+  assert(doc.getElementById('move-count').textContent === '0 played');
+  assert(doc.getElementById('result-layer').hidden);
+  click('draw-button'); click('confirm-draw');
+  assert(doc.getElementById('game-status').textContent === 'Game drawn');
+  assert(doc.getElementById('result-detail').textContent === 'Draw by agreement.');
+});
+await test('No clock mode and actual clock displays track the moving side', () => {
+  doc.getElementById('time-control').value = '0';
+  newGame('local');
+  assert([...doc.querySelectorAll('.player-clock span')].every(element => element.textContent === '∞'));
+  assert(!doc.querySelector('.player-clock.running'));
+  doc.getElementById('time-control').value = '180';
+  newGame('local');
+  assert(doc.querySelector('#bottom-player .player-clock').classList.contains('running'));
+  move('e2','e4');
+  assert(doc.querySelector('#top-player .player-clock').classList.contains('running'));
+  assert(!doc.querySelector('#bottom-player .player-clock').classList.contains('running'));
+  doc.getElementById('time-control').value = '600';
 });
 const passed = results.filter(result => result.pass).length;
 document.getElementById('summary').textContent = `${passed}/${results.length} checks passed`;

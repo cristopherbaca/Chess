@@ -3,42 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f4ef">
-  <meta name="description" content="A quiet place for your next move. Play chess with Cristopher or a friend.">
-  <title>Cristopher — A game of thought</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta name="theme-color" content="#312e2b">
+  <meta name="description" content="Play chess with Cristopher or a friend. Your board, your next move.">
+  <title>Cristopher — Play Chess</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/board.css">
+  <link rel="stylesheet" href="css/components.css">
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="./" aria-label="Cristopher Chess home"><span class="brand-mark" aria-hidden="true">♞</span><span>cristopher<span class="brand-dot">.</span></span></a>
-    <span class="header-caption">A GAME OF THOUGHT</span>
-    <button id="sound-button" class="icon-button" aria-label="Mute sounds" aria-pressed="false" title="Mute sounds">♪</button>
-  </header>
-
+  <svg class="svg-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m9 3 6 1 4 7-4 2-3-2-2 7H6l1-9 4-3-2-3Z"/><path d="M5 21h12M5 18h12"/></symbol>
+    <symbol id="icon-puzzle" viewBox="0 0 24 24"><path d="M3 9h6V6a3 3 0 1 1 6 0v3h6v6h-3a3 3 0 1 0 0 6H3V9Z"/></symbol>
+    <symbol id="icon-learn" viewBox="0 0 24 24"><path d="M12 5v16M3 4c4-1 6-1 9 1 3-2 5-2 9-1v15c-4-1-6-1-9 2-3-3-5-3-9-2V4Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="m9 3 6 0 1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="icon-flip" viewBox="0 0 24 24"><path d="M7 20V4m-4 4 4-4 4 4M17 4v16m-4-4 4 4 4-4"/></symbol>
+    <symbol id="icon-undo" viewBox="0 0 24 24"><path d="M4 10h10a6 6 0 0 1 0 12M9 4l-6 6 6 6"/></symbol>
+    <symbol id="icon-flag" viewBox="0 0 24 24"><path d="M5 22V3c5-4 9 4 15 0v11c-6 4-10-4-15 0"/></symbol>
+    <symbol id="icon-draw" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="icon-next" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="icon-first" viewBox="0 0 24 24"><path d="M5 5v14m13-14-8 7 8 7"/></symbol>
+    <symbol id="icon-last" viewBox="0 0 24 24"><path d="M19 5v14M6 5l8 7-8 7"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="icon-robot" viewBox="0 0 40 40"><rect x="7" y="11" width="26" height="23" rx="6"/><path d="M20 11V6M3 19v9m34-9v9M15 28h10"/><circle cx="14" cy="20" r="2"/><circle cx="26" cy="20" r="2"/><circle cx="20" cy="5" r="2"/></symbol>
+    <symbol id="icon-person" viewBox="0 0 40 40"><circle cx="20" cy="14" r="7"/><path d="M7 35c0-15 26-15 26 0Z"/></symbol>
+    <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M3 5h3c6 0 6 14 12 14h3m-4-4 4 4-4 4M3 19h3c6 0 6-14 12-14h3m-4-4 4 4-4 4"/></symbol>
+  </defs></svg>
+  <nav class="side-nav" aria-label="Main navigation">
+    <a class="nav-brand" href="./" aria-label="Cristopher Chess home">c<span>.</span></a>
+    <button class="nav-item active" id="nav-play" aria-label="Play" data-tooltip="Play" aria-current="page"><svg><use href="#icon-play"/></svg><span>Play</span></button>
+    <button class="nav-item" disabled aria-label="Puzzles — coming soon" data-tooltip="Puzzles · Coming soon"><svg><use href="#icon-puzzle"/></svg><span>Puzzles</span></button>
+    <button class="nav-item" disabled aria-label="Learn — coming soon" data-tooltip="Learn · Coming soon"><svg><use href="#icon-learn"/></svg><span>Learn</span></button>
+    <button class="nav-item nav-settings" id="settings-button" aria-label="Open settings" data-tooltip="Settings"><svg><use href="#icon-settings"/></svg><span>Settings</span></button>
+  </nav>
   <main class="workspace">
     <section class="play-area" aria-label="Chess game">
-      <div class="section-heading"><span class="eyebrow">THE CHESS ROOM</span><span class="room-label"><span class="small-dot"></span> Unrated · Take your time</span></div>
-      <div class="player-strip" id="top-player"><div class="avatar" aria-hidden="true">C</div><div class="player-details"><strong class="player-name">Cristopher</strong><span class="player-description">Your thinking partner</span></div><span class="player-color">BLACK</span></div>
-      <div class="board-frame"><div id="board" class="board" role="group" aria-label="Chess board. Use arrow keys to navigate and Enter to select."></div></div>
-      <div class="player-strip" id="bottom-player"><div class="avatar human-avatar" aria-hidden="true">Y</div><div class="player-details"><strong class="player-name">You</strong><span class="player-description">Make yourself at home</span></div><span class="player-color">WHITE</span></div>
-      <p class="board-hint">A little patience. A little possibility. <span>Click or drag a piece to move.</span></p>
+      <div class="player-strip" id="top-player">
+        <div class="avatar" aria-hidden="true"></div><div class="player-details"><div class="player-heading"><strong class="player-name">Cristopher</strong><span class="rating-chip">AI</span><span class="player-color sr-only">Black</span></div><div class="player-description">Ready to play</div><div class="player-material"><div class="captured-pieces"></div><strong class="material-advantage"></strong></div></div>
+        <div class="player-clock" aria-label="Black clock"><svg><use href="#icon-clock"/></svg><span>10:00</span></div>
+      </div>
+      <div class="board-frame" id="board-frame">
+        <div id="board" class="board" role="group" aria-label="Chess board. Use arrow keys to navigate and Enter to select."></div>
+        <div id="result-layer" class="result-layer" hidden><section class="result-card" role="dialog" aria-labelledby="result-title" aria-describedby="result-detail" tabindex="-1"><button id="close-result" class="close-button" aria-label="Close game result">×</button><div class="result-emblem" aria-hidden="true">½</div><h2 id="result-title">Game over</h2><p id="result-detail"></p><div class="result-players"><div><div id="result-white-avatar" class="avatar"></div><strong id="result-white-name">You</strong><span>White</span></div><span id="result-score">½–½</span><div><div id="result-black-avatar" class="avatar"></div><strong id="result-black-name">Cristopher</strong><span>Black</span></div></div><button id="result-new-game" class="primary-button">New Game</button><button id="rematch-button" class="secondary-button">Rematch</button></section></div>
+      </div>
+      <div class="player-strip" id="bottom-player">
+        <div class="avatar human-avatar" aria-hidden="true"></div><div class="player-details"><div class="player-heading"><strong class="player-name">You</strong><span class="rating-chip">Unrated</span><span class="player-color sr-only">White</span></div><div class="player-description">White</div><div class="player-material"><div class="captured-pieces"></div><strong class="material-advantage"></strong></div></div>
+        <div class="player-clock" aria-label="White clock"><svg><use href="#icon-clock"/></svg><span>10:00</span></div>
+      </div>
+      <div class="board-footer"><span id="board-mode">10 min · Casual game</span><button id="board-settings-button" class="quiet-button" aria-label="Board settings"><svg><use href="#icon-settings"/></svg> Board settings</button></div>
+      <div id="review-indicator" class="review-indicator" hidden><span>Reviewing position</span><button id="back-to-live" class="text-button">Back to live ↗</button></div>
     </section>
-
     <aside class="game-panel" aria-label="Game information and controls">
-      <div class="panel-intro"><span class="eyebrow">MAKE YOUR MOVE</span><h1>Good things<br>take thought.</h1><p>Settle in. The board is yours.</p></div>
-      <section class="status-card" aria-label="Game status"><div class="status-icon" id="status-icon" aria-hidden="true">♔</div><div><h2 id="game-status" role="status" aria-live="polite">White to move</h2><p id="status-detail">Every game starts with a possibility.</p></div><span id="thinking" class="thinking" aria-label="Cristopher is thinking" hidden><i></i><i></i><i></i></span></section>
-      <div id="ai-error" class="error-message" role="alert" hidden><p id="error-text"></p><button id="retry-button" class="text-button">Retry move <span aria-hidden="true">↻</span></button></div>
-      <section class="moves-section" aria-label="Move history"><div class="panel-section-title"><h2>Moves</h2><span id="move-count">0 played</span></div><div class="move-columns" aria-hidden="true"><span>#</span><span>WHITE</span><span>BLACK</span></div><div id="move-scroll" class="move-scroll" tabindex="0" aria-label="Scrollable move history"><p id="empty-moves">A blank page.<br><span>Your first move starts the story.</span></p><table class="move-table" aria-label="Moves in standard algebraic notation"><thead class="sr-only"><tr><th scope="col">Move</th><th scope="col">White</th><th scope="col">Black</th></tr></thead><tbody id="move-list"></tbody></table></div></section>
-      <section class="captures-section" aria-label="Captured pieces"><div class="panel-section-title"><h2>Off the board</h2><span>CAPTURED</span></div><div class="capture-row"><span>By White</span><div id="white-captures" class="captured-pieces"></div><strong id="white-material"></strong></div><div class="capture-row"><span>By Black</span><div id="black-captures" class="captured-pieces"></div><strong id="black-material"></strong></div></section>
-      <div class="controls"><button id="new-game-button" class="primary-button"><span aria-hidden="true">＋</span> New game</button><div class="secondary-controls"><button id="undo-button" aria-label="Undo your move and Cristopher's reply"><span aria-hidden="true">↶</span> Undo</button><button id="flip-button" aria-label="Flip board orientation"><span aria-hidden="true">⇅</span> Flip board</button><button id="resign-button" aria-label="Resign the game"><span aria-hidden="true">⚑</span> Resign</button></div></div>
-      <div class="connection-row"><span id="connection" class="connection" role="status"><i></i><span>Connection · Local placeholder</span></span><span id="difficulty-label">Medium</span></div>
+      <header class="panel-header"><svg><use href="#icon-play"/></svg><h1>Play</h1><span class="brand-label">cristopher<span>.</span></span></header>
+      <div class="panel-tabs" role="tablist" aria-label="Play panel"><button id="new-game-button" role="tab" aria-controls="new-game-pane" aria-selected="true">New Game</button><button id="game-tab" role="tab" aria-controls="game-pane" aria-selected="false" tabindex="-1">Game <span id="tab-move-count"></span></button></div>
+      <section id="new-game-pane" class="tab-pane setup-pane" role="tabpanel" aria-labelledby="new-game-button">
+        <form id="new-game-form">
+          <label class="field-label" for="opponent">Play against</label><div class="opponent-field"><div class="avatar" aria-hidden="true"><svg><use href="#icon-robot"/></svg></div><select id="opponent" name="opponent"><option value="ai">Cristopher (AI)</option><option value="local">Local 2 players</option></select></div>
+          <fieldset class="color-field"><legend>I want to play as</legend><div class="color-options"><label><input type="radio" name="color" value="w" checked><span><img src="assets/pieces/wK.svg" alt="">White</span></label><label><input type="radio" name="color" value="random"><span><svg><use href="#icon-shuffle"/></svg>Random</span></label><label><input type="radio" name="color" value="b"><span><img src="assets/pieces/bK.svg" alt="">Black</span></label></div></fieldset>
+          <fieldset id="difficulty-field"><legend>Difficulty</legend><div class="segmented-control" id="difficulty-options"><button type="button" data-difficulty="easy" aria-pressed="false">Easy</button><button type="button" data-difficulty="medium" aria-pressed="true">Medium</button><button type="button" data-difficulty="hard" aria-pressed="false">Hard</button></div><select id="difficulty" name="difficulty" hidden aria-label="Difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></fieldset>
+          <label class="field-label" for="time-control">Time control</label><div class="time-field"><svg><use href="#icon-clock"/></svg><select id="time-control" name="time"><option value="0">No clock</option><option value="180">3 min · 3 + 0</option><option value="300">5 min · 5 + 0</option><option value="600" selected>10 min · 10 + 0</option></select></div>
+          <button type="submit" class="primary-button play-button"><svg><use href="#icon-play"/></svg>Play</button>
+          <p id="difficulty-note" class="form-note">Cristopher is warming up.<br>For now, all levels play random legal moves.</p>
+        </form>
+        <div class="setup-footer"><span class="online-dot"></span>No pressure. Just chess.</div>
+      </section>
+      <section id="game-pane" class="tab-pane" role="tabpanel" aria-labelledby="game-tab" hidden>
+        <section class="status-card" aria-label="Game status"><span id="status-icon" class="status-icon" aria-hidden="true">♔</span><div><h2 id="game-status" role="status" aria-live="polite">White to move</h2><p id="status-detail">Make your move.</p></div><span id="thinking" class="thinking" aria-label="Cristopher is thinking" hidden><i></i><i></i><i></i></span></section>
+        <div id="ai-error" class="error-message" role="alert" hidden><p id="error-text"></p><button id="retry-button" class="text-button">Retry move ↻</button></div>
+        <div class="move-heading"><span>Moves</span><span id="move-count">0 played</span></div>
+        <div id="move-scroll" class="move-scroll" tabindex="0" aria-label="Scrollable move history"><div id="empty-moves"><svg><use href="#icon-play"/></svg><strong>Your next move starts here.</strong><span>Click or drag a piece to begin.</span></div><table class="move-table" aria-label="Moves in standard algebraic notation"><thead class="sr-only"><tr><th scope="col">Move</th><th scope="col">White</th><th scope="col">Black</th></tr></thead><tbody id="move-list"></tbody></table></div>
+        <div class="history-controls" aria-label="Browse move history"><button id="history-first" class="icon-button" aria-label="First position" title="First position"><svg><use href="#icon-first"/></svg></button><button id="history-back" class="icon-button" aria-label="Previous position" title="Previous position"><svg><use href="#icon-back"/></svg></button><button id="history-next" class="icon-button" aria-label="Next position" title="Next position"><svg><use href="#icon-next"/></svg></button><button id="history-last" class="icon-button" aria-label="Latest position" title="Latest position"><svg><use href="#icon-last"/></svg></button></div>
+        <div class="game-actions"><button id="flip-button" class="icon-button" aria-label="Flip board orientation" title="Flip board"><svg><use href="#icon-flip"/></svg><span>Flip</span></button><button id="undo-button" class="icon-button" aria-label="Undo your move and Cristopher's reply" title="Undo"><svg><use href="#icon-undo"/></svg><span>Undo</span></button><button id="resign-button" class="icon-button" aria-label="Resign the game" title="Resign"><svg><use href="#icon-flag"/></svg><span>Resign</span></button><button id="draw-button" class="icon-button" aria-label="Offer draw" title="Offer draw"><svg><use href="#icon-draw"/></svg><span>Draw</span></button></div>
+        <div class="game-note"><span id="difficulty-label">Medium</span><span>Casual · Unrated</span></div>
+      </section>
+      <div class="connection-row"><span id="connection" class="connection" role="status"><i></i><span>Connection · Local placeholder</span></span><button id="panel-settings-button" class="icon-button" aria-label="Open game settings"><svg><use href="#icon-settings"/></svg></button></div>
     </aside>
   </main>
-  <footer class="site-footer"><span>64 squares. Endless possibilities.</span><span>Made for the love of the game <span aria-hidden="true">↗</span></span></footer>
-
-  <dialog id="new-game-dialog" aria-labelledby="new-game-title"><form id="new-game-form"><div class="dialog-heading"><span class="eyebrow">A FRESH PERSPECTIVE</span><button type="button" class="close-button" data-close="new-game-dialog" aria-label="Close new game options">×</button></div><h2 id="new-game-title">Your next game.</h2><p>Find your side of the board.</p><fieldset><legend>Play as</legend><div class="choice-row"><label><input type="radio" name="color" value="w" checked><span>♔ White</span></label><label><input type="radio" name="color" value="b"><span>♚ Black</span></label><label><input type="radio" name="color" value="random"><span>⇄ Random</span></label></div></fieldset><label class="field-label" for="opponent">Opponent</label><select id="opponent" name="opponent"><option value="ai">Cristopher (AI)</option><option value="local">Local 2 players</option></select><label class="field-label" for="difficulty">Difficulty</label><select id="difficulty" name="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select><p class="form-note" id="difficulty-note">Cristopher plays random legal moves for now. Difficulty is saved for the future AI.</p><button type="submit" class="primary-button">Start playing <span aria-hidden="true">→</span></button></form></dialog>
-  <dialog id="promotion-dialog" aria-labelledby="promotion-title"><span class="eyebrow">A WELL-EARNED UPGRADE</span><h2 id="promotion-title">Choose your piece.</h2><p>Your pawn has reached the other side.</p><div id="promotion-options" class="promotion-options"></div><button id="cancel-promotion" class="text-button">Cancel move</button></dialog>
-  <dialog id="resign-dialog" aria-labelledby="resign-title"><span class="eyebrow">UNTIL THE NEXT GAME</span><h2 id="resign-title">Ready to resign?</h2><p id="resign-description">Your opponent will win this game.</p><div class="dialog-actions"><button class="secondary-button" data-close="resign-dialog">Keep playing</button><button id="confirm-resign" class="primary-button">Resign game</button></div></dialog>
+  <nav class="mobile-actions" aria-label="Quick game actions"><button data-action="undo-button" aria-label="Undo"><svg><use href="#icon-undo"/></svg><span>Undo</span></button><button data-action="flip-button" aria-label="Flip board"><svg><use href="#icon-flip"/></svg><span>Flip</span></button><button data-action="resign-button" aria-label="Resign"><svg><use href="#icon-flag"/></svg><span>Resign</span></button><button id="mobile-menu" aria-label="Open settings menu"><svg><use href="#icon-menu"/></svg><span>Menu</span></button></nav>
+  <dialog id="settings-dialog" aria-labelledby="settings-title"><header class="dialog-heading"><h2 id="settings-title">Make it your board</h2><button class="close-button" data-close="settings-dialog" aria-label="Close settings">×</button></header><p class="dialog-subtitle">A familiar game. Your own style.</p><fieldset><legend>Board theme</legend><div class="theme-options"><label><input type="radio" name="board-theme" value="green"><span><i class="theme-swatch green"></i>Green</span></label><label><input type="radio" name="board-theme" value="brown"><span><i class="theme-swatch brown"></i>Brown</span></label><label><input type="radio" name="board-theme" value="blue"><span><i class="theme-swatch blue"></i>Blue</span></label></div></fieldset><label class="field-label" for="piece-set">Pieces</label><select id="piece-set"><option value="cburnett">Classic · Cburnett</option></select><div class="settings-toggles"><label>Sound <input id="sound-toggle" type="checkbox" role="switch"></label><label>Coordinates <input id="coordinates-toggle" type="checkbox" role="switch"></label><label>Legal moves <input id="legal-toggle" type="checkbox" role="switch"></label><label>Move highlights <input id="highlights-toggle" type="checkbox" role="switch"></label></div><button class="primary-button" data-close="settings-dialog">Done</button></dialog>
+  <dialog id="promotion-dialog" aria-labelledby="promotion-title"><h2 id="promotion-title" class="sr-only">Choose your promotion piece</h2><div id="promotion-options" class="promotion-options"></div><button id="cancel-promotion" class="promotion-cancel" aria-label="Cancel promotion">×</button></dialog>
+  <dialog id="resign-dialog" aria-labelledby="resign-title"><h2 id="resign-title">Resign this game?</h2><p id="resign-description"></p><div class="dialog-actions"><button class="secondary-button" data-close="resign-dialog">Keep playing</button><button id="confirm-resign" class="primary-button">Resign</button></div></dialog>
+  <dialog id="draw-dialog" aria-labelledby="draw-title"><h2 id="draw-title">Offer a draw?</h2><p>Pass the decision to your opponent. Do both players agree to a draw?</p><div class="dialog-actions"><button class="secondary-button" data-close="draw-dialog">Decline</button><button id="confirm-draw" class="primary-button">Accept draw</button></div></dialog>
   <div id="startup-error" class="startup-message" role="alert" hidden>Start a local server from this folder with <code>python3 -m http.server 8080</code>, then visit <a href="http://localhost:8080">localhost:8080</a>. Browsers require a server to load JavaScript modules.</div>
   <noscript><p class="startup-message">Enable JavaScript to play chess.</p></noscript>
   <script>if (location.protocol === 'file:') document.getElementById('startup-error').hidden = false;</script>
