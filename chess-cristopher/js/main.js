@@ -1,71 +1,141 @@
-import { Chess } from '../vendor/chess.js';
-import { Board } from './board.js';
-import { CONFIG } from './config.js';
-import { getCristopherMove, checkCristopherHealth } from './cristopher.js';
-import { PIECE_NAMES, colorName, otherColor, toUci, pieceSource, gameStatus, materialSummary, undoTurn } from './game.js';
-import { avatarMarkup } from './ui/icons.js';
-import { loadSettings, bindSettings } from './ui/settings.js';
-import { ChessClock, formatTime } from './ui/clock.js';
-import { MoveList } from './ui/moveList.js';
-import { createTabs, positionPromotion, dismissOnBackdrop } from './ui/panels.js';
-import { soundNotes } from './ui/sounds.js';
+import { Chess } from "../vendor/chess.js";
+import { Board } from "./board.js";
+import { CONFIG } from "./config.js";
+import { getCristopherMove, checkCristopherHealth } from "./cristopher.js";
+import {
+  PIECE_NAMES,
+  colorName,
+  otherColor,
+  toUci,
+  pieceSource,
+  gameStatus,
+  materialSummary,
+  undoTurn,
+} from "./game.js";
+import { avatarMarkup } from "./ui/icons.js";
+import { loadSettings, bindSettings } from "./ui/settings.js";
+import { ChessClock, formatTime } from "./ui/clock.js";
+import { MoveList } from "./ui/moveList.js";
+import {
+  createTabs,
+  positionPromotion,
+  dismissOnBackdrop,
+} from "./ui/panels.js";
+import { soundNotes } from "./ui/sounds.js";
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 const state = {
-  game: new Chess(), opponent: 'ai', humanColor: 'w', difficulty: 'medium', orientation: 'w',
-  selected: null, resigned: null, pendingPromotion: null, busy: false, aiError: '', requestId: 0,
-  muted: false, audio: null, healthBusy: false, connection: 'local', renderedHistory: '',
-  settings: loadSettings(), reviewPly: null, timeControl: 600, timeout: null, agreedDraw: false,
-  clockHistory: [], resultShown: false, resultFocus: null
+  game: new Chess(),
+  opponent: "ai",
+  humanColor: "w",
+  difficulty: "medium",
+  orientation: "w",
+  selected: null,
+  resigned: null,
+  pendingPromotion: null,
+  busy: false,
+  aiError: "",
+  requestId: 0,
+  muted: false,
+  audio: null,
+  healthBusy: false,
+  connection: "local",
+  renderedHistory: "",
+  settings: loadSettings(),
+  reviewPly: null,
+  timeControl: 600,
+  timeout: null,
+  agreedDraw: false,
+  clockHistory: [],
+  resultShown: false,
+  resultFocus: null,
 };
 state.muted = !state.settings.sound;
-const board = new Board($('board'), { onSquare: clickSquare, onSelect: selectSquare, onDrop: attemptMove, canSelect, onInteract: unlockAudio });
+const board = new Board($("board"), {
+  onSquare: clickSquare,
+  onSelect: selectSquare,
+  onDrop: attemptMove,
+  canSelect,
+  onInteract: unlockAudio,
+});
 const showTab = createTabs();
-const moveList = new MoveList($('move-list'), $('move-scroll'), reviewPosition);
+const moveList = new MoveList($("move-list"), $("move-scroll"), reviewPosition);
 const clock = new ChessClock(renderClocks, expireGame);
 
-function isOver() { return Boolean(state.resigned || state.timeout || state.agreedDraw) || state.game.isGameOver(); }
-function isAiTurn() { return state.opponent === 'ai' && state.game.turn() !== state.humanColor; }
-function canPlay() { return !state.busy && !isOver() && !isAiTurn() && !state.pendingPromotion && state.reviewPly === null; }
-function canSelect(square) { return canPlay() && state.game.get(square)?.color === state.game.turn(); }
-function selectSquare(square) { if (canSelect(square)) { state.selected = square; render(); } }
+function isOver() {
+  return (
+    Boolean(state.resigned || state.timeout || state.agreedDraw) ||
+    state.game.isGameOver()
+  );
+}
+function isAiTurn() {
+  return state.opponent === "ai" && state.game.turn() !== state.humanColor;
+}
+function canPlay() {
+  return (
+    !state.busy &&
+    !isOver() &&
+    !isAiTurn() &&
+    !state.pendingPromotion &&
+    state.reviewPly === null
+  );
+}
+function canSelect(square) {
+  return canPlay() && state.game.get(square)?.color === state.game.turn();
+}
+function selectSquare(square) {
+  if (canSelect(square)) {
+    state.selected = square;
+    render();
+  }
+}
 
 function clickSquare(square) {
   if (!canPlay()) return;
-  if (square === state.selected) { state.selected = null; render(); return; }
-  if (canSelect(square)) { selectSquare(square); return; }
+  if (square === state.selected) {
+    state.selected = null;
+    render();
+    return;
+  }
+  if (canSelect(square)) {
+    selectSquare(square);
+    return;
+  }
   if (state.selected) attemptMove(state.selected, square);
 }
 
 function attemptMove(from, to) {
-  if (!canPlay() || state.game.get(from)?.color !== state.game.turn()) return false;
-  const moves = state.game.moves({ square: from, verbose: true }).filter(move => move.to === to);
+  if (!canPlay() || state.game.get(from)?.color !== state.game.turn())
+    return false;
+  const moves = state.game
+    .moves({ square: from, verbose: true })
+    .filter((move) => move.to === to);
   if (!moves.length) return false;
-  if (moves.some(move => move.promotion)) {
+  if (moves.some((move) => move.promotion)) {
     state.pendingPromotion = { from, to };
-    const options = $('promotion-options');
+    const options = $("promotion-options");
     options.replaceChildren();
-    for (const type of ['q', 'r', 'b', 'n']) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.setAttribute('aria-label', `Promote to ${PIECE_NAMES[type]}`);
-      const image = document.createElement('img');
+    for (const type of ["q", "r", "b", "n"]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-label", `Promote to ${PIECE_NAMES[type]}`);
+      const image = document.createElement("img");
       image.src = pieceSource(state.game.turn(), type);
-      image.alt = '';
-      const label = document.createElement('span');
+      image.alt = "";
+      const label = document.createElement("span");
       label.textContent = PIECE_NAMES[type];
       button.append(image, label);
-      button.addEventListener('click', () => {
+      button.addEventListener("click", () => {
         const pending = state.pendingPromotion;
         state.pendingPromotion = null;
-        $('promotion-dialog').close();
+        $("promotion-dialog").close();
         if (pending) commitMove({ ...pending, promotion: type });
       });
       options.append(button);
     }
     render();
-    $('promotion-dialog').showModal();
-    positionPromotion($('promotion-dialog'), board.squares.get(to));
+    $("promotion-dialog").showModal();
+    positionPromotion($("promotion-dialog"), board.squares.get(to));
     return true;
   }
   commitMove({ from, to });
@@ -78,7 +148,7 @@ function commitMove(move) {
   const result = state.game.move(move);
   state.selected = null;
   afterMove(result);
-  showTab('game');
+  showTab("game");
   render();
   void requestAiMove();
 }
@@ -95,41 +165,67 @@ async function requestAiMove() {
   const requestId = ++state.requestId;
   const fen = state.game.fen();
   state.busy = true;
-  state.aiError = '';
+  state.aiError = "";
   render();
   try {
-    const result = await getCristopherMove({ fen, history: state.game.history({ verbose: true }).map(toUci), difficulty: state.difficulty });
+    const result = await getCristopherMove({
+      fen,
+      history: state.game.history({ verbose: true }).map(toUci),
+      difficulty: state.difficulty,
+    });
     // A new game, undo, resignation, or expired clock invalidates the in-flight reply.
     clock.tick();
-    if (requestId !== state.requestId || fen !== state.game.fen() || isOver()) return;
-    const move = state.game.move({ from: result.move.slice(0, 2), to: result.move.slice(2, 4), ...(result.move[4] ? { promotion: result.move[4] } : {}) });
+    if (requestId !== state.requestId || fen !== state.game.fen() || isOver())
+      return;
+    const move = state.game.move({
+      from: result.move.slice(0, 2),
+      to: result.move.slice(2, 4),
+      ...(result.move[4] ? { promotion: result.move[4] } : {}),
+    });
     afterMove(move);
   } catch (error) {
     if (requestId !== state.requestId) return;
-    state.aiError = error.message || 'Something interrupted Cristopher. Please try again.';
+    state.aiError =
+      error.message || "Something interrupted Cristopher. Please try again.";
   } finally {
-    if (requestId === state.requestId) { state.busy = false; render(); }
+    if (requestId === state.requestId) {
+      state.busy = false;
+      render();
+    }
   }
 }
 
 function invalidateRequest() {
   state.requestId++;
   state.busy = false;
-  state.aiError = '';
+  state.aiError = "";
   state.selected = null;
   board.cancelDrag();
 }
 
 function currentStatus() {
-  if (state.timeout) return { title: `${colorName(otherColor(state.timeout))} wins`, detail: `${colorName(state.timeout)} ran out of time.`, over: true };
-  if (state.agreedDraw) return { title: 'Game drawn', detail: 'Draw by agreement.', over: true };
+  if (state.timeout)
+    return {
+      title: `${colorName(otherColor(state.timeout))} wins`,
+      detail: `${colorName(state.timeout)} ran out of time.`,
+      over: true,
+    };
+  if (state.agreedDraw)
+    return { title: "Game drawn", detail: "Draw by agreement.", over: true };
   return gameStatus(state.game, state.resigned);
 }
 
 function reviewGame() {
   if (state.reviewPly === null) return state.game;
   const game = new Chess();
-  for (const move of state.game.history({ verbose: true }).slice(0, state.reviewPly)) game.move({ from: move.from, to: move.to, ...(move.promotion ? { promotion: move.promotion } : {}) });
+  for (const move of state.game
+    .history({ verbose: true })
+    .slice(0, state.reviewPly))
+    game.move({
+      from: move.from,
+      to: move.to,
+      ...(move.promotion ? { promotion: move.promotion } : {}),
+    });
   return game;
 }
 
@@ -137,77 +233,123 @@ function render() {
   const history = state.game.history({ verbose: true });
   const status = currentStatus();
   const displayed = reviewGame();
-  const shownHistory = state.reviewPly === null ? history : history.slice(0, state.reviewPly);
-  board.render({ game: displayed, orientation: state.orientation, selected: state.selected, lastMove: shownHistory.at(-1), enabled: canPlay() });
-  $('game-status').textContent = status.title;
-  $('status-detail').textContent = state.busy ? 'Cristopher is thinking…' : state.aiError ? 'Waiting for Cristopher. Retry when you’re ready.' : status.detail;
-  $('status-icon').textContent = status.over ? '⚑' : state.game.turn() === 'w' ? '♔' : '♚';
-  $('thinking').hidden = !state.busy;
-  $('ai-error').hidden = !state.aiError;
-  $('error-text').textContent = state.aiError;
-  $('undo-button').disabled = !history.length || Boolean(state.resigned || state.timeout || state.agreedDraw) || state.reviewPly !== null || (state.opponent === 'ai' && state.humanColor === 'b' && history.length === 1);
-  $('resign-button').disabled = status.over || state.reviewPly !== null;
-  $('draw-button').disabled = status.over || state.reviewPly !== null || state.opponent === 'ai';
-  $('draw-button').title = state.opponent === 'ai' ? 'Draw offers are available in local games' : 'Offer a draw';
-  $('difficulty-label').textContent = state.opponent === 'local' ? 'Local · 2 players' : `${state.difficulty[0].toUpperCase()}${state.difficulty.slice(1)}`;
-  $('board-mode').textContent = `${state.timeControl ? `${state.timeControl / 60} min` : 'No clock'} · Casual game`;
-  renderPlayer('top-player', otherColor(state.orientation));
-  renderPlayer('bottom-player', state.orientation);
+  const shownHistory =
+    state.reviewPly === null ? history : history.slice(0, state.reviewPly);
+  board.render({
+    game: displayed,
+    orientation: state.orientation,
+    selected: state.selected,
+    lastMove: shownHistory.at(-1),
+    enabled: canPlay(),
+  });
+  $("game-status").textContent = status.title;
+  $("status-detail").textContent = state.busy
+    ? "Cristopher is thinking…"
+    : state.aiError
+      ? "Waiting for Cristopher. Retry when you’re ready."
+      : status.detail;
+  $("status-icon").textContent = status.over
+    ? "⚑"
+    : state.game.turn() === "w"
+      ? "♔"
+      : "♚";
+  $("thinking").hidden = !state.busy;
+  $("ai-error").hidden = !state.aiError;
+  $("error-text").textContent = state.aiError;
+  $("undo-button").disabled =
+    !history.length ||
+    Boolean(state.resigned || state.timeout || state.agreedDraw) ||
+    state.reviewPly !== null ||
+    (state.opponent === "ai" &&
+      state.humanColor === "b" &&
+      history.length === 1);
+  $("resign-button").disabled = status.over || state.reviewPly !== null;
+  $("draw-button").disabled =
+    status.over || state.reviewPly !== null || state.opponent === "ai";
+  $("draw-button").title =
+    state.opponent === "ai"
+      ? "Draw offers are available in local games"
+      : "Offer a draw";
+  $("difficulty-label").textContent =
+    state.opponent === "local"
+      ? "Local · 2 players"
+      : `${state.difficulty[0].toUpperCase()}${state.difficulty.slice(1)}`;
+  $("board-mode").textContent =
+    `${state.timeControl ? `${state.timeControl / 60} min` : "No clock"} · Casual game`;
+  renderPlayer("top-player", otherColor(state.orientation));
+  renderPlayer("bottom-player", state.orientation);
   renderClocks(clock.value());
   renderHistory(history);
   renderMaterial(displayed);
-  for (const button of document.querySelectorAll('[data-action]')) button.disabled = $(button.dataset.action).disabled;
+  for (const button of document.querySelectorAll("[data-action]"))
+    button.disabled = $(button.dataset.action).disabled;
   if (status.over) {
     clock.stop();
     if (!state.resultShown) showResult(status);
   } else {
     state.resultShown = false;
-    $('result-layer').hidden = true;
+    $("result-layer").hidden = true;
   }
 }
 
-function playerName(color) { return state.opponent === 'local' ? (color === 'w' ? 'Player 1' : 'Player 2') : color === state.humanColor ? 'You' : 'Cristopher'; }
+function playerName(color) {
+  return state.opponent === "local"
+    ? color === "w"
+      ? "Player 1"
+      : "Player 2"
+    : color === state.humanColor
+      ? "You"
+      : "Cristopher";
+}
 
 function renderPlayer(id, color) {
   const element = $(id);
-  const ai = state.opponent === 'ai' && color !== state.humanColor;
+  const ai = state.opponent === "ai" && color !== state.humanColor;
   element.dataset.color = color;
-  element.querySelector('.player-name').textContent = playerName(color);
-  element.querySelector('.rating-chip').textContent = ai ? 'AI' : 'Unrated';
-  const description = element.querySelector('.player-description');
-  description.textContent = ai && state.busy ? 'Cristopher is thinking' : `${colorName(color)}${ai ? ' · Your chess partner' : ''}`;
+  element.querySelector(".player-name").textContent = playerName(color);
+  element.querySelector(".rating-chip").textContent = ai ? "AI" : "Unrated";
+  const description = element.querySelector(".player-description");
+  description.textContent =
+    ai && state.busy
+      ? "Cristopher is thinking"
+      : `${colorName(color)}${ai ? " · Your chess partner" : ""}`;
   if (ai && state.busy) {
-    const dots = document.createElement('span');
-    dots.className = 'thinking';
-    dots.setAttribute('aria-hidden', 'true');
-    dots.innerHTML = '<i></i><i></i><i></i>';
+    const dots = document.createElement("span");
+    dots.className = "thinking";
+    dots.setAttribute("aria-hidden", "true");
+    dots.innerHTML = "<i></i><i></i><i></i>";
     description.append(dots);
   }
-  element.querySelector('.player-color').textContent = colorName(color);
-  const avatar = element.querySelector('.avatar');
+  element.querySelector(".player-color").textContent = colorName(color);
+  const avatar = element.querySelector(".avatar");
   avatar.innerHTML = avatarMarkup(ai);
-  avatar.classList.toggle('human-avatar', !ai);
-  const prefix = color === 'w' ? 'white' : 'black';
-  element.querySelector('.captured-pieces').id = `${prefix}-captures`;
-  element.querySelector('.material-advantage').id = `${prefix}-material`;
-  element.classList.toggle('active-player', state.game.turn() === color && !isOver());
+  avatar.classList.toggle("human-avatar", !ai);
+  const prefix = color === "w" ? "white" : "black";
+  element.querySelector(".captured-pieces").id = `${prefix}-captures`;
+  element.querySelector(".material-advantage").id = `${prefix}-material`;
+  element.classList.toggle(
+    "active-player",
+    state.game.turn() === color && !isOver(),
+  );
 }
 
 function renderHistory(history) {
   moveList.render(history, state.reviewPly);
-  $('empty-moves').hidden = history.length > 0;
-  $('move-count').textContent = `${history.length} played`;
-  $('tab-move-count').textContent = history.length || '';
+  $("empty-moves").hidden = history.length > 0;
+  $("move-count").textContent = `${history.length} played`;
+  $("tab-move-count").textContent = history.length || "";
   const current = state.reviewPly ?? history.length;
-  $('history-first').disabled = $('history-back').disabled = current === 0;
-  $('history-next').disabled = $('history-last').disabled = current === history.length;
-  $('review-indicator').hidden = state.reviewPly === null;
-  $('review-indicator').querySelector('span').textContent = `Reviewing ${current === 0 ? 'starting position' : `move ${Math.ceil(current / 2)} · ${current % 2 ? 'White' : 'Black'}`}`;
+  $("history-first").disabled = $("history-back").disabled = current === 0;
+  $("history-next").disabled = $("history-last").disabled =
+    current === history.length;
+  $("review-indicator").hidden = state.reviewPly === null;
+  $("review-indicator").querySelector("span").textContent =
+    `Reviewing ${current === 0 ? "starting position" : `move ${Math.ceil(current / 2)} · ${current % 2 ? "White" : "Black"}`}`;
 }
 
 function reviewPosition(ply) {
   if (state.pendingPromotion) return;
-  $('result-layer').hidden = true;
+  $("result-layer").hidden = true;
   const length = state.game.history().length;
   const next = Math.max(0, Math.min(length, ply));
   state.reviewPly = next === length ? null : next;
@@ -218,34 +360,49 @@ function reviewPosition(ply) {
 
 function renderMaterial(game = state.game) {
   const { captured, balance } = materialSummary(game);
-  for (const color of ['w', 'b']) {
-    const prefix = color === 'w' ? 'white' : 'black';
+  for (const color of ["w", "b"]) {
+    const prefix = color === "w" ? "white" : "black";
     const container = $(`${prefix}-captures`);
     container.replaceChildren();
     for (const type of captured[color]) {
-      const image = document.createElement('img');
+      const image = document.createElement("img");
       image.src = pieceSource(otherColor(color), type);
       image.alt = `${colorName(otherColor(color))} ${PIECE_NAMES[type]}`;
       container.append(image);
     }
-    const advantage = color === 'w' ? balance : -balance;
+    const advantage = color === "w" ? balance : -balance;
     container.parentElement.hidden = !captured[color].length && advantage <= 0;
-    if (!captured[color].length) container.textContent = '—';
-    $(`${prefix}-material`).textContent = advantage > 0 ? `+${advantage}` : '';
-    $(`${prefix}-material`).setAttribute('aria-label', advantage > 0 ? `${colorName(color)} is ahead by ${advantage} material points` : '');
+    if (!captured[color].length) container.textContent = "—";
+    $(`${prefix}-material`).textContent = advantage > 0 ? `+${advantage}` : "";
+    $(`${prefix}-material`).setAttribute(
+      "aria-label",
+      advantage > 0
+        ? `${colorName(color)} is ahead by ${advantage} material points`
+        : "",
+    );
   }
 }
 
 function renderClocks(value) {
-  for (const id of ['top-player', 'bottom-player']) {
+  for (const id of ["top-player", "bottom-player"]) {
     const element = $(id);
-    const color = element.dataset.color || (id === 'top-player' ? otherColor(state.orientation) : state.orientation);
-    const timer = element.querySelector('.player-clock');
-    timer.querySelector('span').textContent = value.seconds ? formatTime(value.remaining[color]) : '∞';
-    timer.classList.toggle('running', value.active === color);
-    timer.classList.toggle('low-time', Boolean(value.seconds && value.remaining[color] < 20000));
-    timer.classList.toggle('no-clock', !value.seconds);
-    timer.setAttribute('aria-label', `${colorName(color)} clock: ${value.seconds ? formatTime(value.remaining[color]) : 'No clock'}`);
+    const color =
+      element.dataset.color ||
+      (id === "top-player" ? otherColor(state.orientation) : state.orientation);
+    const timer = element.querySelector(".player-clock");
+    timer.querySelector("span").textContent = value.seconds
+      ? formatTime(value.remaining[color])
+      : "∞";
+    timer.classList.toggle("running", value.active === color);
+    timer.classList.toggle(
+      "low-time",
+      Boolean(value.seconds && value.remaining[color] < 20000),
+    );
+    timer.classList.toggle("no-clock", !value.seconds);
+    timer.setAttribute(
+      "aria-label",
+      `${colorName(color)} clock: ${value.seconds ? formatTime(value.remaining[color]) : "No clock"}`,
+    );
   }
 }
 
@@ -253,85 +410,108 @@ function expireGame(color) {
   if (isOver()) return;
   state.timeout = color;
   state.pendingPromotion = null;
-  $('promotion-dialog').close();
+  $("promotion-dialog").close();
   invalidateRequest();
   playSound({});
-  showTab('game');
+  showTab("game");
   render();
 }
 
 function showResult(status) {
   state.resultShown = true;
-  $('resign-dialog').close();
-  $('draw-dialog').close();
+  $("resign-dialog").close();
+  $("draw-dialog").close();
   state.resultFocus = document.activeElement;
-  $('result-title').textContent = status.title.replace('wins', 'won');
-  $('result-detail').textContent = status.detail;
-  const winner = status.title.startsWith('White') ? 'w' : status.title.startsWith('Black') ? 'b' : null;
-  $('result-score').textContent = winner === 'w' ? '1–0' : winner === 'b' ? '0–1' : '½–½';
-  document.querySelector('.result-emblem').textContent = winner ? '♚' : '½';
-  for (const color of ['w', 'b']) {
-    const prefix = color === 'w' ? 'white' : 'black';
-    const ai = state.opponent === 'ai' && color !== state.humanColor;
+  $("result-title").textContent = status.title.replace("wins", "won");
+  $("result-detail").textContent = status.detail;
+  const winner = status.title.startsWith("White")
+    ? "w"
+    : status.title.startsWith("Black")
+      ? "b"
+      : null;
+  $("result-score").textContent =
+    winner === "w" ? "1–0" : winner === "b" ? "0–1" : "½–½";
+  document.querySelector(".result-emblem").textContent = winner ? "♚" : "½";
+  for (const color of ["w", "b"]) {
+    const prefix = color === "w" ? "white" : "black";
+    const ai = state.opponent === "ai" && color !== state.humanColor;
     $(`result-${prefix}-avatar`).innerHTML = avatarMarkup(ai);
-    $(`result-${prefix}-avatar`).classList.toggle('human-avatar', !ai);
+    $(`result-${prefix}-avatar`).classList.toggle("human-avatar", !ai);
     $(`result-${prefix}-name`).textContent = playerName(color);
   }
-  $('result-layer').hidden = false;
-  $('close-result').focus({ preventScroll: true });
+  $("result-layer").hidden = false;
+  $("close-result").focus({ preventScroll: true });
 }
 
 function closeResult() {
-  $('result-layer').hidden = true;
-  if (state.resultFocus?.isConnected) state.resultFocus.focus({ preventScroll: true });
+  $("result-layer").hidden = true;
+  if (state.resultFocus?.isConnected)
+    state.resultFocus.focus({ preventScroll: true });
 }
 
 function unlockAudio() {
   if (state.muted) return;
   try {
     state.audio ||= new (window.AudioContext || window.webkitAudioContext)();
-    if (state.audio.state === 'suspended') void state.audio.resume().catch(() => {});
-  } catch { /* Audio is optional when the browser cannot provide it. */ }
+    if (state.audio.state === "suspended")
+      void state.audio.resume().catch(() => {});
+  } catch {
+    /* Audio is optional when the browser cannot provide it. */
+  }
 }
 
 function playSound(move) {
-  if (state.muted || !state.audio || state.audio.state !== 'running') return;
-  const frequencies = soundNotes(move, { over: isOver(), check: state.game.isCheck() });
+  if (state.muted || !state.audio || state.audio.state !== "running") return;
+  const frequencies = soundNotes(move, {
+    over: isOver(),
+    check: state.game.isCheck(),
+  });
   const start = state.audio.currentTime;
   frequencies.forEach((frequency, index) => {
     const oscillator = state.audio.createOscillator();
     const gain = state.audio.createGain();
     const time = start + index * 0.085;
-    oscillator.type = 'sine';
+    oscillator.type = "sine";
     oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(0.10, time + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.1, time + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
     oscillator.connect(gain);
     gain.connect(state.audio.destination);
     oscillator.start(time);
     oscillator.stop(time + 0.13);
-    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    };
   });
 }
 
 async function updateConnection() {
   if (!CONFIG.USE_API || state.healthBusy) return;
   state.healthBusy = true;
-  try { await checkCristopherHealth(); state.connection = 'online'; }
-  catch { state.connection = 'offline'; }
-  finally { state.healthBusy = false; renderConnection(); }
+  try {
+    await checkCristopherHealth();
+    state.connection = "online";
+  } catch {
+    state.connection = "offline";
+  } finally {
+    state.healthBusy = false;
+    renderConnection();
+  }
 }
 
 function renderConnection() {
-  $('connection').className = `connection ${state.connection}`;
-  $('connection').querySelector('span').textContent = `Connection · ${{ local: 'Local placeholder', checking: 'Connecting…', online: 'Online', offline: 'Offline' }[state.connection]}`;
+  $("connection").className = `connection ${state.connection}`;
+  $("connection").querySelector("span").textContent =
+    `Connection · ${{ local: "Local placeholder", checking: "Connecting…", online: "Online", offline: "Offline" }[state.connection]}`;
 }
 
 function startGame({ color, opponent, difficulty, time }) {
   invalidateRequest();
   state.game.reset();
-  state.humanColor = color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
+  state.humanColor =
+    color === "random" ? (Math.random() < 0.5 ? "w" : "b") : color;
   state.orientation = state.humanColor;
   state.opponent = opponent;
   state.difficulty = difficulty;
@@ -342,99 +522,185 @@ function startGame({ color, opponent, difficulty, time }) {
   state.pendingPromotion = null;
   state.reviewPly = null;
   state.resultShown = false;
-  $('result-layer').hidden = true;
-  $('promotion-dialog').close();
+  $("result-layer").hidden = true;
+  $("promotion-dialog").close();
   clock.start(state.timeControl);
   state.clockHistory = [clock.snapshot()];
   unlockAudio();
-  showTab('game');
+  showTab("game");
   render();
   void requestAiMove();
 }
 
-$('new-game-form').addEventListener('submit', event => {
+$("new-game-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget);
-  startGame({ color: data.get('color'), opponent: data.get('opponent'), difficulty: $('difficulty').value, time: data.get('time') });
+  startGame({
+    color: data.get("color"),
+    opponent: data.get("opponent"),
+    difficulty: $("difficulty").value,
+    time: data.get("time"),
+  });
 });
-$('opponent').addEventListener('change', () => {
-  const local = $('opponent').value === 'local';
-  $('difficulty').disabled = local;
-  $('difficulty-note').hidden = local;
-  document.querySelectorAll('[data-difficulty]').forEach(button => { button.disabled = local; });
-  document.querySelector('.opponent-field .avatar').innerHTML = avatarMarkup(!local);
+$("opponent").addEventListener("change", () => {
+  const local = $("opponent").value === "local";
+  $("difficulty").disabled = local;
+  $("difficulty-note").hidden = local;
+  document.querySelectorAll("[data-difficulty]").forEach((button) => {
+    button.disabled = local;
+  });
+  document.querySelector(".opponent-field .avatar").innerHTML =
+    avatarMarkup(!local);
 });
-for (const button of document.querySelectorAll('[data-difficulty]')) {
-  button.addEventListener('click', () => {
-    $('difficulty').value = button.dataset.difficulty;
-    document.querySelectorAll('[data-difficulty]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+for (const button of document.querySelectorAll("[data-difficulty]")) {
+  button.addEventListener("click", () => {
+    $("difficulty").value = button.dataset.difficulty;
+    document
+      .querySelectorAll("[data-difficulty]")
+      .forEach((item) =>
+        item.setAttribute("aria-pressed", String(item === button)),
+      );
   });
 }
-if (CONFIG.USE_API) $('difficulty-note').textContent = 'Difficulty is sent to Cristopher with every move request.';
-$('undo-button').addEventListener('click', () => {
-  if ($('undo-button').disabled) return;
+if (CONFIG.USE_API)
+  $("difficulty-note").textContent =
+    "Difficulty is sent to Cristopher with every move request.";
+$("undo-button").addEventListener("click", () => {
+  if ($("undo-button").disabled) return;
   invalidateRequest();
   undoTurn(state.game, state.opponent, state.humanColor);
   const ply = state.game.history().length;
-  clock.restore(state.clockHistory[ply] || state.clockHistory[0], state.game.turn());
+  clock.restore(
+    state.clockHistory[ply] || state.clockHistory[0],
+    state.game.turn(),
+  );
   state.clockHistory.length = ply + 1;
   state.reviewPly = null;
   state.resultShown = false;
   render();
   void requestAiMove();
 });
-$('flip-button').addEventListener('click', () => { state.orientation = otherColor(state.orientation); render(); });
-$('resign-button').addEventListener('click', () => {
-  const color = state.opponent === 'ai' ? state.humanColor : state.game.turn();
-  $('resign-description').textContent = `${colorName(color)} resigns and ${colorName(otherColor(color))} wins this game.`;
-  $('resign-dialog').showModal();
+$("flip-button").addEventListener("click", () => {
+  state.orientation = otherColor(state.orientation);
+  render();
 });
-$('confirm-resign').addEventListener('click', () => {
-  $('resign-dialog').close();
+$("resign-button").addEventListener("click", () => {
+  const color = state.opponent === "ai" ? state.humanColor : state.game.turn();
+  $("resign-description").textContent =
+    `${colorName(color)} resigns and ${colorName(otherColor(color))} wins this game.`;
+  $("resign-dialog").showModal();
+});
+$("confirm-resign").addEventListener("click", () => {
+  $("resign-dialog").close();
   if (!isOver()) {
-    state.resigned = state.opponent === 'ai' ? state.humanColor : state.game.turn();
+    state.resigned =
+      state.opponent === "ai" ? state.humanColor : state.game.turn();
     invalidateRequest();
     clock.stop();
     playSound({});
     render();
   }
 });
-$('draw-button').addEventListener('click', () => $('draw-dialog').showModal());
-$('confirm-draw').addEventListener('click', () => {
-  $('draw-dialog').close();
-  if (state.opponent === 'local' && !isOver()) { state.agreedDraw = true; clock.stop(); playSound({}); render(); }
+$("draw-button").addEventListener("click", () => $("draw-dialog").showModal());
+$("confirm-draw").addEventListener("click", () => {
+  $("draw-dialog").close();
+  if (state.opponent === "local" && !isOver()) {
+    state.agreedDraw = true;
+    clock.stop();
+    playSound({});
+    render();
+  }
 });
-$('retry-button').addEventListener('click', () => { void updateConnection(); void requestAiMove(); });
-$('history-first').addEventListener('click', () => reviewPosition(0));
-$('history-back').addEventListener('click', () => reviewPosition((state.reviewPly ?? state.game.history().length) - 1));
-$('history-next').addEventListener('click', () => reviewPosition((state.reviewPly ?? state.game.history().length) + 1));
-$('history-last').addEventListener('click', () => reviewPosition(state.game.history().length));
-$('back-to-live').addEventListener('click', () => reviewPosition(state.game.history().length));
-$('close-result').addEventListener('click', closeResult);
-$('result-new-game').addEventListener('click', () => { closeResult(); showTab('new'); $('new-game-button').focus(); document.querySelector('.game-panel').scrollIntoView({ block: 'nearest' }); });
-$('rematch-button').addEventListener('click', () => startGame({ color: state.humanColor, opponent: state.opponent, difficulty: state.difficulty, time: state.timeControl }));
-$('nav-play').addEventListener('click', () => { showTab('new'); $('new-game-button').focus(); });
-for (const id of ['settings-button', 'board-settings-button', 'panel-settings-button', 'mobile-menu']) $(id).addEventListener('click', () => $('settings-dialog').showModal());
-for (const button of document.querySelectorAll('[data-action]')) button.addEventListener('click', () => $(button.dataset.action).click());
-document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
-bindSettings(state.settings, settings => { state.muted = !settings.sound; if (settings.sound) unlockAudio(); });
-function cancelPromotion() { state.pendingPromotion = null; $('promotion-dialog').close(); render(); }
-$('cancel-promotion').addEventListener('click', cancelPromotion);
-$('promotion-dialog').addEventListener('cancel', event => { event.preventDefault(); cancelPromotion(); });
-dismissOnBackdrop($('promotion-dialog'), cancelPromotion);
-dismissOnBackdrop($('settings-dialog'), () => $('settings-dialog').close());
-window.addEventListener('resize', () => { if (state.pendingPromotion) positionPromotion($('promotion-dialog'), board.squares.get(state.pendingPromotion.to)); });
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || document.querySelector('dialog[open]')) return;
-  if (!$('result-layer').hidden) closeResult();
-  else { state.selected = null; board.cancelDrag(); render(); }
+$("retry-button").addEventListener("click", () => {
+  void updateConnection();
+  void requestAiMove();
+});
+$("history-first").addEventListener("click", () => reviewPosition(0));
+$("history-back").addEventListener("click", () =>
+  reviewPosition((state.reviewPly ?? state.game.history().length) - 1),
+);
+$("history-next").addEventListener("click", () =>
+  reviewPosition((state.reviewPly ?? state.game.history().length) + 1),
+);
+$("history-last").addEventListener("click", () =>
+  reviewPosition(state.game.history().length),
+);
+$("back-to-live").addEventListener("click", () =>
+  reviewPosition(state.game.history().length),
+);
+$("close-result").addEventListener("click", closeResult);
+$("result-new-game").addEventListener("click", () => {
+  closeResult();
+  showTab("new");
+  $("new-game-button").focus();
+  document.querySelector(".game-panel").scrollIntoView({ block: "nearest" });
+});
+$("rematch-button").addEventListener("click", () =>
+  startGame({
+    color: state.humanColor,
+    opponent: state.opponent,
+    difficulty: state.difficulty,
+    time: state.timeControl,
+  }),
+);
+$("nav-play").addEventListener("click", () => {
+  showTab("new");
+  $("new-game-button").focus();
+});
+for (const id of [
+  "settings-button",
+  "board-settings-button",
+  "panel-settings-button",
+  "mobile-menu",
+])
+  $(id).addEventListener("click", () => $("settings-dialog").showModal());
+for (const button of document.querySelectorAll("[data-action]"))
+  button.addEventListener("click", () => $(button.dataset.action).click());
+document
+  .querySelectorAll("[data-close]")
+  .forEach((button) =>
+    button.addEventListener("click", () => $(button.dataset.close).close()),
+  );
+bindSettings(state.settings, (settings) => {
+  state.muted = !settings.sound;
+  if (settings.sound) unlockAudio();
+});
+function cancelPromotion() {
+  state.pendingPromotion = null;
+  $("promotion-dialog").close();
+  render();
+}
+$("cancel-promotion").addEventListener("click", cancelPromotion);
+$("promotion-dialog").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  cancelPromotion();
+});
+dismissOnBackdrop($("promotion-dialog"), cancelPromotion);
+dismissOnBackdrop($("settings-dialog"), () => $("settings-dialog").close());
+window.addEventListener("resize", () => {
+  if (state.pendingPromotion)
+    positionPromotion(
+      $("promotion-dialog"),
+      board.squares.get(state.pendingPromotion.to),
+    );
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+  if (!$("result-layer").hidden) closeResult();
+  else {
+    state.selected = null;
+    board.cancelDrag();
+    render();
+  }
 });
 clock.start(state.timeControl);
 state.clockHistory = [clock.snapshot()];
 render();
 if (CONFIG.USE_API) {
-  state.connection = 'checking';
+  state.connection = "checking";
   renderConnection();
   void updateConnection();
-  setInterval(() => { if (!document.hidden) void updateConnection(); }, 30000);
+  setInterval(() => {
+    if (!document.hidden) void updateConnection();
+  }, 30000);
 }

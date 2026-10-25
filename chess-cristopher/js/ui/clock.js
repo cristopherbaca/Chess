@@ -10,7 +10,7 @@ export class ChessClock {
     this.timer = setInterval(() => this.tick(), 100);
   }
 
-  start(seconds, color = 'w') {
+  start(seconds, color = "w") {
     this.seconds = seconds;
     this.remaining = { w: seconds * 1000, b: seconds * 1000 };
     this.active = seconds ? color : null;
@@ -18,13 +18,22 @@ export class ChessClock {
     this.onTick(this.value());
   }
 
-  value() { return { remaining: { ...this.remaining }, seconds: this.seconds, active: this.active }; }
+  value() {
+    return {
+      remaining: { ...this.remaining },
+      seconds: this.seconds,
+      active: this.active,
+    };
+  }
 
   tick() {
     if (!this.active) return;
     const color = this.active;
     const now = this.now();
-    this.remaining[color] = Math.max(0, this.remaining[color] - Math.max(0, now - this.stamp));
+    this.remaining[color] = Math.max(
+      0,
+      this.remaining[color] - Math.max(0, now - this.stamp),
+    );
     this.stamp = now;
     if (this.remaining[color] === 0) this.active = null;
     this.onTick(this.value());
@@ -39,8 +48,14 @@ export class ChessClock {
     this.onTick(this.value());
   }
 
-  snapshot() { this.tick(); return this.value(); }
-  stop() { this.active = null; this.onTick(this.value()); }
+  snapshot() {
+    this.tick();
+    return this.value();
+  }
+  stop() {
+    this.active = null;
+    this.onTick(this.value());
+  }
 
   restore(snapshot, color) {
     this.remaining = { ...snapshot.remaining };
@@ -50,10 +65,12 @@ export class ChessClock {
     this.onTick(this.value());
   }
 
-  destroy() { clearInterval(this.timer); }
+  destroy() {
+    clearInterval(this.timer);
+  }
 }
 
 export function formatTime(milliseconds) {
   const seconds = Math.ceil(Math.max(0, milliseconds) / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

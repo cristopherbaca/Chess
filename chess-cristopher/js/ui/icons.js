@@ -3,5 +3,5 @@ export function iconMarkup(name) {
 }
 
 export function avatarMarkup(isAI) {
-  return iconMarkup(isAI ? 'robot' : 'person');
+  return iconMarkup(isAI ? "robot" : "person");
 }

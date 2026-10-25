@@ -77,7 +77,7 @@ export const CONFIG = {
   USE_API: false, // Change to true to enable fetch requests.
   API_URL: "http://localhost:8000",
   REQUEST_TIMEOUT_MS: 15000,
-  EXTRA_HEADERS: {}
+  EXTRA_HEADERS: {},
 };
 ```
 
@@ -86,12 +86,12 @@ This is browser-visible configuration: do not place private API secrets in it. E
 ### JavaScript interface
 
 ```js
-import { getCristopherMove } from './js/cristopher.js';
+import { getCristopherMove } from "./js/cristopher.js";
 
 const { move, info } = await getCristopherMove({
-  fen: '...',
-  history: ['e2e4', 'e7e5'],
-  difficulty: 'medium'
+  fen: "...",
+  history: ["e2e4", "e7e5"],
+  difficulty: "medium",
 });
 // move: "g1f3" or a promotion such as "e7e8q"
 // info: optional object supplied by the API; currently not displayed
@@ -138,18 +138,18 @@ Coverage includes Scholar's mate; castling both ways for both colors and rejecti
 
 Useful manual scenarios (choose **Local 2 players**):
 
-| Scenario | Moves / expected result |
-| --- | --- |
-| Scholar's mate | `1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#`; White wins, Black king highlighted, input locked. |
-| Kingside castling | `1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6`; drag e1 to g1 for the castle, verify rook on f1. |
-| Queenside castling | `1. d4 d5 2. Nc3 Nc6 3. Bf4 Bf5 4. Qd2 Qd7 5. O-O-O O-O-O`; kings on c1/c8, rooks on d1/d8. |
-| En passant | `1. e4 a6 2. e5 d5 3. exd6`; d5 pawn disappears, capture/material update; Undo restores it. |
-| Promotion | `1. a4 h5 2. a5 h4 3. a6 h3 4. axb7 hxg2 5. bxa8`; picker opens. Cancel, retry, and choose each piece using Undo between attempts. |
-| Stalemate | The browser runner verifies `7k/5Q2/6K1/8/8/8/8/8 b - - 0 1` reports “Game drawn / Stalemate.” |
-| AI undo | Make a move, wait for Cristopher, then Undo; both moves disappear. Repeat and Undo while “thinking…” is visible; no delayed move should appear. |
-| History | After a few moves, click an earlier SAN move; the board is read-only and the live move count is unchanged. Use the arrows and Back to live. |
-| Clock | Select 3+0, verify that only the moving side counts down, and leave it to expire; the opponent wins on time. No clock shows ∞ and never flags. |
-| Mobile / keyboard | At 390px width, check no horizontal overflow, tap and touch-drag moves, open the promotion picker and cancel outside; Tab to board and use arrows plus Enter. |
+| Scenario           | Moves / expected result                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scholar's mate     | `1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#`; White wins, Black king highlighted, input locked.                                                                  |
+| Kingside castling  | `1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6`; drag e1 to g1 for the castle, verify rook on f1.                                                                 |
+| Queenside castling | `1. d4 d5 2. Nc3 Nc6 3. Bf4 Bf5 4. Qd2 Qd7 5. O-O-O O-O-O`; kings on c1/c8, rooks on d1/d8.                                                                   |
+| En passant         | `1. e4 a6 2. e5 d5 3. exd6`; d5 pawn disappears, capture/material update; Undo restores it.                                                                   |
+| Promotion          | `1. a4 h5 2. a5 h4 3. a6 h3 4. axb7 hxg2 5. bxa8`; picker opens. Cancel, retry, and choose each piece using Undo between attempts.                            |
+| Stalemate          | The browser runner verifies `7k/5Q2/6K1/8/8/8/8/8 b - - 0 1` reports “Game drawn / Stalemate.”                                                                |
+| AI undo            | Make a move, wait for Cristopher, then Undo; both moves disappear. Repeat and Undo while “thinking…” is visible; no delayed move should appear.               |
+| History            | After a few moves, click an earlier SAN move; the board is read-only and the live move count is unchanged. Use the arrows and Back to live.                   |
+| Clock              | Select 3+0, verify that only the moving side counts down, and leave it to expire; the opponent wins on time. No clock shows ∞ and never flags.                |
+| Mobile / keyboard  | At 390px width, check no horizontal overflow, tap and touch-drag moves, open the promotion picker and cancel outside; Tab to board and use arrows plus Enter. |
 
 The actual Python API is outside Phase 1; API behavior is verified with browser-side mock responses, including failures.
 
