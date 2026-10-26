@@ -1,4 +1,4 @@
-# Cristopher Phase 2: CUDA neuroevolution
+# Chess — Phase 2: CUDA neuroevolution
 
 The default in [cristopher.ipynb](vendor/cristopher.ipynb) is now **GPU-based neuroevolution for a three-hour session**. PyTorch evaluates populations of neural chess evaluators on CUDA and performs Evolution Strategy updates from played-game rewards. CPU workers handle chess rules and prepare successor positions, preferably through compiled C++. No API server or frontend changes are included.
 

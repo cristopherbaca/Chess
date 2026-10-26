@@ -1,4 +1,4 @@
-# Cristopher Chess
+# Chess
 
 A responsive chess frontend in plain HTML, CSS, and vanilla JavaScript ES modules. No framework, package installation, or build step. Offline mode chooses random legal moves after a 400–800 ms delay. Phase 3 of `vendor/cristopher.ipynb` serves the exported Python champion through FastAPI and a public tunnel.
 
@@ -38,7 +38,7 @@ Desktop uses a board and tabbed game panel, without a navigation sidebar. At 600
 ## Project structure
 
 ```text
-chess-cristopher/
+Chess/
   index.html
   css/variables.css     Design tokens, themes, base styles
   css/layout.css        Desktop/tablet/mobile layout and player bars
@@ -57,9 +57,12 @@ chess-cristopher/
   js/ui/sounds.js       WebAudio note sequences
   assets/pieces/        Local SVG pieces, attribution, license
   vendor/chess.js       chess.js 1.4.0, browser ES module
-  vendor/LICENSE-chess.js
+  vendor/LICENSE-chess.md
+  vendor/cristopher.ipynb  AI training and API deployment notebook
   tests/index.html      Browser regression runner
   tests/tests.js
+  tests/test_api.py     API regression checks
+  PHASE2_README.md      AI training documentation
   LICENSES.md           Asset sources and licenses
   README.md
 ```
@@ -149,7 +152,7 @@ Implementation references: [Starlette thread pool](https://www.starlette.io/thre
 
 With the static server running, open **http://localhost:8080/tests/**. This dependency-free browser runner checks rule scenarios, real UI interactions in an iframe, and mocked API requests. It does not connect to a real AI server. Each check reports pass/fail.
 
-Validated in Chrome: all **29 browser checks pass**. Separate browser checks passed for mouse dragging, illegal snap-back, move/castling animations (both king and rook), actual stalemate and clock-timeout result overlays, and touch dragging at 390px width. Desktop and mobile screenshots were inspected; the page, vertical promotion picker, and Settings dialog fit without horizontal overflow. Other browsers and physical mobile devices have not been tested.
+Validated in Chrome: all **31 browser checks pass**. Separate browser checks passed for mouse dragging, illegal snap-back, move/castling animations (both king and rook), actual stalemate and clock-timeout result overlays, and touch dragging at 390px width. Desktop and mobile screenshots were inspected; the page, vertical promotion picker, and Settings dialog fit without horizontal overflow. Other browsers and physical mobile devices have not been tested.
 
 Coverage includes Scholar's mate; castling both ways for both colors and rejection through check; en passant; all promotion choices and cancellation; stalemate, repetition, insufficient material, and 50-move draws; SAN and capture rendering; keyboard navigation; automatic Black orientation; completed and pending AI undo; stale replies after New Game and resignation; API contract, headers, illegal replies, HTTP/network/JSON errors, timeouts, health, and Retry. The redesign adds checks for history review/live restoration, saved themes and display preferences, clock switching/restoration/timeout, no-clock mode, result cards, rematches, and local draw agreement.
 
@@ -192,6 +195,6 @@ Additional local integration checks passed:
 
 ## Third-party credits
 
-- [chess.js 1.4.0](https://github.com/jhlywa/chess.js/tree/v1.4.0), Jeff Hlywa and contributors, BSD-2-Clause; local license in `vendor/LICENSE-chess.js`.
+- [chess.js 1.4.0](https://github.com/jhlywa/chess.js/tree/v1.4.0), Jeff Hlywa and contributors, BSD-2-Clause; local license in `vendor/LICENSE-chess.md`.
 - Cburnett SVG chess pieces by Colin M. Burnett, GPL-2.0-or-later, sourced unchanged from Lichess; attribution and full license in `assets/pieces/`.
 - All UI icons and avatars are original inline SVG; sounds are generated with WebAudio and fonts are system fonts. See [LICENSES.md](LICENSES.md). No Chess.com proprietary assets are used.
