@@ -1,14 +1,13 @@
 # Chess — Phase 2: CUDA neuroevolution
 
-The default in [cristopher.ipynb](vendor/cristopher.ipynb) is now **GPU-based neuroevolution for a three-hour session**. PyTorch evaluates populations of neural chess evaluators on CUDA and performs Evolution Strategy updates from played-game rewards. CPU workers handle chess rules and prepare successor positions, preferably through compiled C++. No API server or frontend changes are included.
+The default in [train.ipynb](vendor/train.ipynb) is now **GPU-based neuroevolution for a three-hour session**. PyTorch evaluates populations of neural chess evaluators on CUDA and performs Evolution Strategy updates from played-game rewards. CPU workers handle chess rules and prepare successor positions, preferably through compiled C++. Deployment is independent in [deploy.ipynb](vendor/deploy.ipynb); Run all there loads the saved champion and returns a URL.
 
 ## Run the GPU trainer
 
-1. Open the notebook in Colab, or install Google's [VS Code Colab extension](https://marketplace.visualstudio.com/items?itemName=Google.colab), open the notebook and select a Colab kernel.
-2. Select a **GPU runtime** (your approximately 15 GB GPU is suitable for the configured budget). Reconnect if the runtime changes.
-3. Run section 0. Defaults are `TRAINING_MODE='gpu_neuroevolution'`, `QUICK_TEST=False`, `run_name='gpu_es_v1'`, and `max_hours=3.0`.
-4. Run sections 1–5 in order and mount the same Google Drive account. Setup verifies CUDA. Section 5 compiles native move preparation where available and writes an importable worker module to Drive.
-5. Run section 6 to train. Look for **`Training GPU: ...`**, **`Neural population device: cuda`**, neural positions/second, and CUDA allocated/reserved/peak memory in its progress messages.
+1. Open **train.ipynb** in Colab or select a Colab kernel in VS Code.
+2. Select a **GPU runtime** and choose **Run all**. Allow access to your Drive.
+3. The collapsed settings form defaults to GPU neuroevolution, the existing `gpu_es_v1` run, and a three-hour budget. Expand code only if you want advanced configuration.
+4. Setup, engine definitions, training, champion export and a fresh-process legality test run in order. Progress reports CUDA usage and each newly saved champion. The same Run all resumes an interrupted run.
 
 `gpu_require_cuda=True` prevents an accidental CPU-only training session. If CUDA is unavailable, select a GPU runtime; do not disable that check to make the error disappear. CPU test mode exists for local software verification, not as the default training path.
 
@@ -65,58 +64,36 @@ checkpoints/gpu_es_v1/gpu_XXXXXXXX.pt       # last three snapshots
 logs/gpu_es_v1/gpu_gXXXXXX/game_XXXXX.json # completed game records
 pgn/gpu_es_v1/gpu_gXXXXXX/game_XXXXX.pgn
 logs/gpu_es_v1/gpu_history.json
-logs/gpu_es_v1/gpu_evolution.png
 models/cristopher_gpu_worker.py
 models/cristopher_gpu_children.cpp
 models/cristopher_gpu_children.so          # runtime/platform-specific optional helper
 models/chess.hpp                          # pinned header, including MIT license
-models/cristopher_genome.json             # selected-model manifest
-models/cristopher_gpu_*.pt                 # exported neural weights
-models/cristopher_engine.py
-models/cristopher_gpu_hall.pt
+models/latest_champion.json               # atomic pointer to a complete snapshot
+models/deployments/<id>/manifest.json     # per-file checksums
+models/deployments/<id>/cristopher_engine.py
+models/deployments/<id>/cristopher_genome.json
+models/deployments/<id>/weights.pt        # immutable selected neural champion
 ```
 
-Checkpoints contain the ES center, initial and selected models, Hall of Fame, mutation sigma, perturbation seeds, RNG state, prior, generation, settings, and every in-progress move history. They are written every 60 seconds, after each generation, and at a clean stop. Completed result files and PGNs are also written per game. A sudden runtime loss can lose recent unsaved moves, but finished game records are recovered.
+Checkpoints contain the ES center, initial and selected models, Hall of Fame, mutation sigma, perturbation seeds, RNG state, prior, generation, settings, and every in-progress move history. They are written about every 60 seconds after the current batch, after each generation, and on a recoverable stop/error. The selected champion is published before training and after every promotion using immutable bundles plus an atomic pointer; older bundles remain available. A hard runtime kill cannot trigger a final save, so only completed Drive writes are recoverable. Completed result files and PGNs are also written per game. A sudden runtime loss can lose recent unsaved moves, but finished game records are recovered.
 
 To resume:
 
 1. Reconnect to a GPU runtime and mount the same Drive.
-2. Run sections 0–5 with the same `run_name`, architecture and experiment settings.
-3. Rerun section 6. It restores the population and unfinished games automatically.
+2. Open **train.ipynb** with the same run name, architecture and experiment settings.
+3. Choose **Run all**. It restores the population and unfinished games automatically.
 
 Use one runtime per run name. Press Stop once to save early; pending CPU preparation may need a moment to finish. Closing VS Code does not guarantee a graceful shutdown. Keep the same CUDA/CPU device family for perturbation generation when resuming; CPU-only tests are separate experiments. Changing architecture/population/reward settings requires a new run name. Session duration, workers and inference chunk sizes can change without invalidating the checkpoint, although floating-point execution and throughput can differ.
 
 Previous classic and neural checkpoints remain in their original directories. The new default GPU run is separate. Its own checkpoints cannot be resumed by the classic trainer.
 
-## Notebook sections
+## Two compact notebooks
 
-| Section | Purpose                                                                    |
-| ------- | -------------------------------------------------------------------------- |
-| 0       | GPU mode, three-hour budget, population, hardware/worker settings          |
-| 1       | GPU check, packages, Drive, compiler, Stockfish                            |
-| 2       | JavaScript baseline and legality check                                     |
-| 3       | Classic evaluation definitions, also supplying the GPU prior               |
-| 4       | Classic search definitions; not the GPU training search body               |
-| 5       | Classic definitions plus CUDA population, CPU preparation and worker setup |
-| 6       | Start/resume the selected training mode; plot progress                     |
-| 7       | Load a saved model; optional independent final evaluation                  |
-| 8       | Legacy NumPy stage 2; skipped in GPU mode                                  |
-| 9       | Export the selected model and verify it in a fresh process                 |
-| 10      | Optional SVG quick play                                                    |
+**train.ipynb:** settings → Drive/runtime setup → engine definitions → train/resume → verify saved champion. Code is collapsed using Colab forms and Jupyter/VS Code metadata. It never starts the API. The default Run all does not run optional lengthy benchmarks or interactive quick play.
 
-`QUICK_TEST=True` selects a smaller GPU population/network and shorter session for checking the pipeline. CUDA is still required by default. The full GPU run does not automatically execute the old CPU-only stage-2 prototype.
+**deploy.ipynb:** load saved champion → build API → start/self-test server → start/test tunnel and print URL. It does not train, wait in a heartbeat loop, or shut itself down. It verifies the selected snapshot’s hashes; old flat exports are supported if no snapshot pointer exists. Keep its runtime connected and use the URL in the web game's Settings. To stop, call `shutdown_api()` or disconnect the runtime.
 
-## Test or play without restarting training
-
-Run sections 0–5, **skip section 6**, leave `CFG['run_evaluation']=False`, then run sections 7–10. In a notebook code cell—not a zsh terminal—run:
-
-```python
-quick_play('white', 'medium')
-```
-
-Enter SAN (`e4`) or UCI (`e2e4`); `quit` stops. The board renders as SVG and the played game is saved to Drive. If no selected champion has improved yet, export/play uses the initial champion and says so rather than presenting it as a proven learned improvement.
-
-Set `CFG['run_evaluation']=True` in section 7 for at least 20 alternating-color games per opponent/difficulty against random, JSBot, initialization and several supported Stockfish Elo levels. Completed evaluation games resume; PGNs and results are saved. Ratings use a logistic fit and opening-pair bootstrap intervals. Unfinished games are excluded. Inadequate or one-sided evidence produces no finite Elo claim. Stockfish UCI_Elo is an approximate engine calibration, not a human/FIDE rating.
+`QUICK_TEST=True` remains an advanced small-run configuration inside the training settings cell. CUDA is still required by default. Existing evaluation routines remain available in the generated worker module for separately requested benchmarks; they are not part of Run all.
 
 ## Export contract
 
@@ -130,11 +107,11 @@ result = engine.get_move(fen, history=None, difficulty='medium')
 
 Scores are centipawns from the moving side's perspective. History must contain legal UCI moves from the standard starting position and reach the supplied FEN; custom positions may use `None`. Mate-in-one takes priority, repetition is avoided when ahead where an alternative exists, and promotions include their UCI suffix. Positions with no legal moves raise a game-over error.
 
-GPU-mode easy samples top moves with occasional inaccuracies; medium/hard use bounded 2/3-ply beam lookahead, with configured time budgets. This differs from classic alpha-beta. Deadlines are checked between expansions; completing a batched evaluation can slightly exceed them. No HTTP API is built in this phase.
+GPU-mode easy samples top moves with occasional inaccuracies; medium/hard use bounded 2/3-ply beam lookahead, with configured time budgets. This differs from classic alpha-beta. Deadlines are checked between expansions; completing a batched evaluation can slightly exceed them. The separate deployment notebook wraps this export in the HTTP API.
 
 ## Classic mode
 
-Set `TRAINING_MODE='classic'` in section 0 to use the previous CPU-only, 787-gene genetic algorithm. It retains material, tapered PSTs, mobility, pawn structure, king shield/tempo, alpha-beta, crossover/mutation, and its original checkpoint signature. Its optional NumPy stage 2 is also CPU-only. Choosing classic mode will not use CUDA. The current default is the new GPU mode.
+Set `TRAINING_MODE='classic'` in the training settings form to use the previous CPU-only, 787-gene genetic algorithm. It retains material, tapered PSTs, mobility, pawn structure, king shield/tempo, alpha-beta, crossover/mutation, and its original checkpoint signature. Its optional NumPy stage-2 definitions remain CPU-only and are not run by the default notebook workflow. Choosing classic mode will not use CUDA. The current default is the new GPU mode.
 
 ## What was verified locally
 

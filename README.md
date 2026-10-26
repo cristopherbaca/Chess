@@ -1,6 +1,6 @@
 # Chess
 
-A responsive chess frontend in plain HTML, CSS, and vanilla JavaScript ES modules. No framework, package installation, or build step. Offline mode chooses random legal moves after a 400–800 ms delay. Phase 3 of `vendor/cristopher.ipynb` serves the exported Python champion through FastAPI and a public tunnel.
+A responsive chess frontend in plain HTML, CSS, and vanilla JavaScript ES modules. No framework, package installation, or build step. Offline mode chooses random legal moves after a 400–800 ms delay. `vendor/train.ipynb` trains and saves the champion; `vendor/deploy.ipynb` serves it through FastAPI and a public tunnel. Each notebook supports **Run all** independently.
 
 ## Run
 
@@ -58,10 +58,13 @@ Chess/
   assets/pieces/        Local SVG pieces, attribution, license
   vendor/chess.js       chess.js 1.4.0, browser ES module
   vendor/LICENSE-chess.md
-  vendor/cristopher.ipynb  AI training and API deployment notebook
+  vendor/train.ipynb    Training, automatic champion saving, resume
+  vendor/deploy.ipynb   Deployment only; Run all returns the public URL
   tests/index.html      Browser regression runner
   tests/tests.js
   tests/test_api.py     API regression checks
+  tests/test_notebooks.py  Persistence and recovery checks
+  tests/test_deployment_flow.py  Local deployment Run-all integration
   PHASE2_README.md      AI training documentation
   LICENSES.md           Asset sources and licenses
   README.md
@@ -69,12 +72,20 @@ Chess/
 
 ## Connect to Cristopher
 
-1. Open `vendor/cristopher.ipynb` in VS Code with the Colab extension and connect to a Colab runtime.
-2. Export a champion using section 9 if you have not already done so. The models folder must contain `cristopher_engine.py`, `cristopher_genome.json`, and any neural `.pt` weights named by the genome metadata.
-3. Run **Phase 3: Deploy the API** in order: install/load, FastAPI app, background server/self-test, then public tunnel. You can run Phase 3 directly without rerunning training. The default tunnel is Cloudflare; optionally set `TUNNEL = "ngrok"` and supply `NGROK_TOKEN` in Colab secrets or the hidden prompt.
-4. Copy the printed HTTPS base URL. Open the web game's **Settings → Connect to Cristopher**, paste it into **Server URL**, and enable **Use AI server**.
-5. Press **Test connection**. Check **Connected (xx ms)** and the engine/version shown below it. Choose Easy, Medium, or Hard in New Game and press Play.
-6. Leave Colab connected while playing. The optional heartbeat prints the URL, request count, and last request time every 60 seconds. Stop that cell, then run the shutdown cell when finished.
+1. **Train:** open [vendor/train.ipynb](vendor/train.ipynb) in Colab (or VS Code with a Colab kernel), select a GPU runtime, and choose **Run all**. Allow Drive access. The default budget is three hours; the same run name resumes saved progress.
+2. **Deploy:** open [vendor/deploy.ipynb](vendor/deploy.ipynb) in another Colab runtime and choose **Run all**. It loads the saved champion, starts FastAPI, opens a tunnel, tests both endpoints, and finishes by printing the verified **HTTPS URL**. It does not train or run an infinite heartbeat, and it leaves the API running. CPU inference is supported.
+3. Paste that URL into **Settings → Connect to Cristopher → Server URL**, enable **Use AI server**, and press **Test connection**. Select AI, choose a difficulty, and press Play.
+4. Keep the deployment runtime connected. To stop it, disconnect the runtime or call `shutdown_api()` in a new notebook cell. Cloudflare is the default; the deployment form also supports ngrok using the `NGROK_TOKEN` Colab secret or a hidden prompt.
+
+### Automatic champion saving
+
+GPU training writes resumable checkpoints about every **60 seconds**, after the current batch, at generation boundaries, and on recoverable exit. It retains the last three checkpoints, including the current population and in-progress games. Each new selected champion is exported during training, not just at the end; the initial baseline is also exported before training starts. Generation `-1` means no challenger has passed the existing promotion gate yet.
+
+Snapshots are complete, immutable folders under `MyDrive/cristopher_evo/models/deployments/`. Only after all files are written does an atomic `models/latest_champion.json` pointer select the new bundle. Deployment checks its file hashes before loading it. An interrupted write leaves the previous published champion usable. Older bundles remain available; unchanged champions do not produce duplicate exports. Legacy flat exports are still accepted when no pointer exists. Classic mode retains its existing generation-winner selection and saves it after each completed generation.
+
+A killed runtime cannot execute a final save: the last completed Drive save survives, while unsaved work since then may be lost. Run all in the training notebook again to recover, with the same Drive account, run name and experiment settings. Keep one training runtime per run name. Drive must remain mounted and writable.
+
+Both notebooks use short Markdown instructions plus collapsed executable code cells: [Colab forms](https://colab.research.google.com/notebooks/forms.ipynb) and [Jupyter hidden-source metadata](https://nbformat.readthedocs.io/en/5.2.0/format_description.html#cell-metadata). Expand a cell to inspect its code; Markdown itself is not used to execute Python.
 
 The URL changes when the tunnel restarts. Paste the new URL, test it, close Settings, and press **Retry** to continue a pending turn. A failed move leaves the board intact with Retry, Reconnect / change URL, and Undo. While waiting, board input is locked; **Cancel request** appears after five seconds. The existing game clock continues through connection failures and retries.
 
@@ -88,7 +99,7 @@ With **Use AI server** switched off, the browser runs a random legal-move bot en
 
 During development, a temporary **local test API** ran on `localhost:8000` using default test weights to verify the integration. That was a separate process on this computer, not your Colab session or trained champion, and it was shut down after the tests. Serving this website with `python3 -m http.server 8080` starts only the web page, never the AI API.
 
-To use your own model, connect the notebook to Colab, ensure section 9 exported the model, then run **Phase 3 steps 1–4** in order. Wait for the local self-test and public tunnel tests to print OK. Copy the **HTTPS tunnel URL** into the web page's **Settings → Server URL**, enable **Use AI server**, and press **Test connection**. Choose **AI opponent** and press **Play**. Keep Colab connected. The heartbeat cell is optional; run shutdown only when you finish playing. The same instructions are available under **How to start the API** in Settings.
+To use your own model, run **train.ipynb → Run all** first, then **deploy.ipynb → Run all**. Copy the HTTPS URL into Settings, enable the server toggle and select AI. The same instructions are under **How to start the API** in Settings.
 
 ### JavaScript interface
 
@@ -143,7 +154,7 @@ Errors use `{"error":"..."}`: invalid FEN, finished game, or mismatched history 
 - **URL changed:** copy the newly printed tunnel URL into Settings and test again. An old URL does not reconnect to a new Colab session.
 - **Tunnel down:** check the notebook's local self-test, then rerun the tunnel cell and wait for its public health/move tests to print OK. If Cloudflare detects an existing config file, use a clean Colab runtime or move that config temporarily.
 - **Mixed content:** an HTTPS webpage cannot call an ordinary HTTP server. Use an HTTPS tunnel URL; localhost is the development exception. Settings warns about this mismatch.
-- **Missing files / runtime disconnected:** run the export first or reconnect Colab and rerun Phase 3. GPU exports need their referenced weights file too. A heartbeat cannot prevent Colab runtime limits.
+- **Missing files / runtime disconnected:** run the training notebook first, then reconnect Colab and Run all in the deployment notebook. Keep each snapshot’s engine, metadata and weights together. Deployment cannot prevent Colab runtime limits.
 - **Timeout:** Retry after the engine finishes its previous request, choose a lower difficulty, or inspect `/stats`. Undo remains available under the existing game rules.
 
 Implementation references: [Starlette thread pool](https://www.starlette.io/threadpool/) and [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
@@ -171,7 +182,7 @@ Useful manual scenarios (choose **Local 2 players**):
 | Clock              | Select 3+0, verify that only the moving side counts down, and leave it to expire; the opponent wins on time. No clock shows ∞ and never flags.                |
 | Mobile / keyboard  | At 390px width, check no horizontal overflow, tap and touch-drag moves, open the promotion picker and cancel outside; Tab to board and use arrows plus Enter. |
 
-Phase 3 API regression tests run directly from the notebook cells with default classic test weights (no training or Drive needed):
+API regression tests run directly from the deployment notebook cells with default classic test weights (no training or Drive needed):
 
 ```sh
 python -m pip install fastapi uvicorn nest_asyncio python-chess numpy httpx requests
@@ -191,10 +202,21 @@ Additional local integration checks passed:
 - GPU export loading and all three difficulties on CPU, including neural depth-1 fallback, using an existing small local test model. This does not establish GPU runtime performance or champion strength.
 - The mobile Settings panel fits at 390px without horizontal overflow. Browser tests also verify the 20-second polling interval and hidden-tab cancellation with simulated visibility events.
 
-**Not verified here:** Colab Drive mounting, live Cloudflare/ngrok tunnel creation and public URL tests, the user's actual exported champion, or long-term Colab connectivity. The tunnel cell includes public health and legal-move tests with retries to run in the connected Colab runtime. The existing training cells and vendored chess.js remain unchanged.
+**Not verified here:** Colab Drive mounting, live Cloudflare/ngrok tunnel creation and public URL tests, the user's actual exported champion, or long-term Colab connectivity. The tunnel cell includes public health and legal-move tests with retries to run in the connected Colab runtime. The existing evolution and promotion rules and vendored chess.js are preserved; checkpoint publication and notebook execution are updated for separate Run-all workflows.
 
 ## Third-party credits
 
 - [chess.js 1.4.0](https://github.com/jhlywa/chess.js/tree/v1.4.0), Jeff Hlywa and contributors, BSD-2-Clause; local license in `vendor/LICENSE-chess.md`.
 - Cburnett SVG chess pieces by Colin M. Burnett, GPL-2.0-or-later, sourced unchanged from Lichess; attribution and full license in `assets/pieces/`.
 - All UI icons and avatars are original inline SVG; sounds are generated with WebAudio and fonts are system fonts. See [LICENSES.md](LICENSES.md). No Chess.com proprietary assets are used.
+
+## Notebook workflow checks
+
+```sh
+python -m pip install torch nbformat
+python -m unittest discover -s tests -p 'test_notebooks.py' -v
+# Separate integration check: binds localhost:8000; Colab and tunnel provider are mocked.
+python tests/test_deployment_flow.py
+```
+
+Local tests cover interrupted checkpoint writes, corrupted-checkpoint recovery, failed champion publication, deduplication, resume, and loading the saved champion without training. The training cells were executed sequentially with a tiny CPU configuration and local setup in place of Colab mounting/installations. Deployment Run all was executed twice against real local HTTP with simulated Colab and tunnel services, checking URL output, continued service, rerun cleanup, and explicit shutdown. These checks do not verify a three-hour CUDA session, actual Drive synchronization, the rendered Colab form UI, or a live public tunnel.

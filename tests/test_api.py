@@ -1,4 +1,4 @@
-"""Run Phase 3 locally, using the unchanged classic engine with default test weights.
+"""Run the deployment notebook API locally, using the unchanged classic engine with default test weights.
 
 python -m pip install fastapi uvicorn nest_asyncio python-chess numpy httpx requests
 python tests/test_api.py
@@ -20,8 +20,9 @@ from unittest.mock import patch
 import chess
 from fastapi.testclient import TestClient
 
-NOTEBOOK = Path(__file__).resolve().parents[1] / 'vendor/cristopher.ipynb'
-CELLS = json.loads(NOTEBOOK.read_text())['cells']
+ROOT = Path(__file__).resolve().parents[1]
+TRAINING_CELLS = json.loads((ROOT / 'vendor/train.ipynb').read_text())['cells']
+CELLS = json.loads((ROOT / 'vendor/deploy.ipynb').read_text())['cells']
 
 def cell(name):
     return ''.join(next(c['source'] for c in CELLS if c['id'] == 'phase3-' + name))
@@ -31,8 +32,10 @@ def environment():
     sys.modules[engine_module.__name__] = engine_module
     sources = []
     for variable in ('CORE_SOURCE', 'EVAL_SOURCE', 'SEARCH_SOURCE'):
-        source = next(''.join(c['source']) for c in CELLS if ''.join(c['source']).startswith(variable + ' ='))
-        assignment = ast.parse(source).body[0]
+        assignment = next(node for c in TRAINING_CELLS if c['cell_type'] == 'code'
+                          for node in ast.parse(''.join(c['source'])).body
+                          if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                          and node.targets[0].id == variable)
         sources.append(ast.literal_eval(assignment.value))
     exec(compile('\n\n'.join(sources), '<exported-engine>', 'exec'), engine_module.__dict__)
     with tempfile.TemporaryDirectory() as directory:

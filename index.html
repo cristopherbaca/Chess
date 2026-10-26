@@ -525,23 +525,10 @@
         <details class="api-help">
           <summary>How to start the API</summary>
           <ol>
-            <li>
-              Open <code>vendor/cristopher.ipynb</code> and connect it to a
-              Colab runtime.
-            </li>
-            <li>
-              Run section 9 (Export) if you have not saved your trained model
-              yet.
-            </li>
-            <li>
-              Run Phase 3: Install and load, FastAPI app, background server,
-              then public tunnel. Wait for the public tests to print OK.
-            </li>
-            <li>Paste the printed HTTPS URL here and press Test connection.</li>
-            <li>
-              Keep Colab connected while playing. Paste the new URL whenever you
-              restart the tunnel.
-            </li>
+            <li>First, open <code>vendor/train.ipynb</code> in a GPU Colab runtime and choose Run all. It trains and saves the champion to Drive automatically.</li>
+            <li>Open <code>vendor/deploy.ipynb</code> in another Colab runtime and choose Run all. It only deploys the saved model and finishes with a verified HTTPS URL.</li>
+            <li>Paste that URL here, enable Use AI server, and press Test connection.</li>
+            <li>Keep the deployment runtime connected while playing. Run all again and paste the new URL when restarting deployment.</li>
           </ol>
           <p>
             The web page cannot start Colab. The offline bot plays random legal
