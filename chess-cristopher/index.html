@@ -91,53 +91,13 @@
         </symbol>
       </defs>
     </svg>
-    <nav class="side-nav" aria-label="Main navigation">
-      <a class="nav-brand" href="./" aria-label="Cristopher Chess home"
-        >c<span>.</span></a
-      >
-      <button
-        class="nav-item active"
-        id="nav-play"
-        aria-label="Play"
-        data-tooltip="Play"
-        aria-current="page"
-      >
-        <svg><use href="#icon-play" /></svg><span>Play</span>
-      </button>
-      <button
-        class="nav-item"
-        disabled
-        aria-label="Puzzles — coming soon"
-        data-tooltip="Puzzles · Coming soon"
-      >
-        <svg><use href="#icon-puzzle" /></svg><span>Puzzles</span>
-      </button>
-      <button
-        class="nav-item"
-        disabled
-        aria-label="Learn — coming soon"
-        data-tooltip="Learn · Coming soon"
-      >
-        <svg><use href="#icon-learn" /></svg><span>Learn</span>
-      </button>
-      <button
-        class="nav-item nav-settings"
-        id="settings-button"
-        aria-label="Open settings"
-        data-tooltip="Settings"
-      >
-        <svg><use href="#icon-settings" /></svg><span>Settings</span>
-      </button>
-    </nav>
     <main class="workspace">
       <section class="play-area" aria-label="Chess game">
         <div class="player-strip" id="top-player">
           <div class="avatar" aria-hidden="true"></div>
           <div class="player-details">
             <div class="player-heading">
-              <strong class="player-name">Cristopher</strong
-              ><span class="rating-chip">AI</span
-              ><span class="player-color sr-only">Black</span>
+              <strong class="player-color">Black</strong>
             </div>
             <div class="player-description">Ready to play</div>
             <div class="player-material">
@@ -177,13 +137,12 @@
               <div class="result-players">
                 <div>
                   <div id="result-white-avatar" class="avatar"></div>
-                  <strong id="result-white-name">You</strong><span>White</span>
+                  <strong id="result-white-name">White</strong>
                 </div>
                 <span id="result-score">½–½</span>
                 <div>
                   <div id="result-black-avatar" class="avatar"></div>
-                  <strong id="result-black-name">Cristopher</strong
-                  ><span>Black</span>
+                  <strong id="result-black-name">Black</strong>
                 </div>
               </div>
               <button id="result-new-game" class="primary-button">
@@ -198,9 +157,7 @@
           <div class="avatar human-avatar" aria-hidden="true"></div>
           <div class="player-details">
             <div class="player-heading">
-              <strong class="player-name">You</strong
-              ><span class="rating-chip">Unrated</span
-              ><span class="player-color sr-only">White</span>
+              <strong class="player-color">White</strong>
             </div>
             <div class="player-description">White</div>
             <div class="player-material">
@@ -215,11 +172,11 @@
         <div class="board-footer">
           <span id="board-mode">10 min · Casual game</span
           ><button
-            id="board-settings-button"
+            id="settings-button"
             class="quiet-button"
-            aria-label="Board settings"
+            aria-label="Open settings"
           >
-            <svg><use href="#icon-settings" /></svg> Board settings
+            <svg><use href="#icon-settings" /></svg> Settings
           </button>
         </div>
         <div id="review-indicator" class="review-indicator" hidden>
@@ -231,7 +188,6 @@
         <header class="panel-header">
           <svg><use href="#icon-play" /></svg>
           <h1>Play</h1>
-          <span class="brand-label">cristopher<span>.</span></span>
         </header>
         <div class="panel-tabs" role="tablist" aria-label="Play panel">
           <button
@@ -264,7 +220,7 @@
                 <svg><use href="#icon-robot" /></svg>
               </div>
               <select id="opponent" name="opponent">
-                <option value="ai">Cristopher (AI)</option>
+                <option value="ai">AI opponent</option>
                 <option value="local">Local 2 players</option>
               </select>
             </div>
@@ -339,7 +295,7 @@
             </p>
           </form>
           <div class="setup-footer">
-            <span class="online-dot"></span>No pressure. Just chess.
+            Press Play to start the game and clock.
           </div>
         </section>
         <section
@@ -367,9 +323,16 @@
               ><i></i><i></i><i></i
             ></span>
           </section>
+          <button id="cancel-ai" class="text-button" hidden>
+            Cancel request
+          </button>
+          <p id="ai-notice" class="form-note" role="status" hidden></p>
           <div id="ai-error" class="error-message" role="alert" hidden>
             <p id="error-text"></p>
             <button id="retry-button" class="text-button">Retry move ↻</button>
+            <button id="reconnect-button" class="text-button">
+              Reconnect / change URL
+            </button>
           </div>
           <div class="move-heading">
             <span>Moves</span><span id="move-count">0 played</span>
@@ -469,13 +432,7 @@
         <div class="connection-row">
           <span id="connection" class="connection" role="status"
             ><i></i><span>Connection · Local placeholder</span></span
-          ><button
-            id="panel-settings-button"
-            class="icon-button"
-            aria-label="Open game settings"
           >
-            <svg><use href="#icon-settings" /></svg>
-          </button>
         </div>
       </aside>
     </main>
@@ -485,9 +442,7 @@
       ><button data-action="flip-button" aria-label="Flip board">
         <svg><use href="#icon-flip" /></svg><span>Flip</span></button
       ><button data-action="resign-button" aria-label="Resign">
-        <svg><use href="#icon-flag" /></svg><span>Resign</span></button
-      ><button id="mobile-menu" aria-label="Open settings menu">
-        <svg><use href="#icon-menu" /></svg><span>Menu</span>
+        <svg><use href="#icon-flag" /></svg><span>Resign</span>
       </button>
     </nav>
     <dialog id="settings-dialog" aria-labelledby="settings-title">
@@ -539,6 +494,72 @@
           <input id="highlights-toggle" type="checkbox" role="switch"
         /></label>
       </div>
+      <fieldset class="api-settings">
+        <legend>Connect to Cristopher</legend>
+        <div class="settings-toggles">
+          <label>Use AI server <input id="use-api" type="checkbox" role="switch" /></label>
+        </div>
+        <p class="form-note">The server is used only for AI games while this switch is on. Switch it off to play the offline random bot. Local two-player games never use the API automatically.</p>
+        <label class="field-label" for="api-url">Server URL</label>
+        <input
+          id="api-url"
+          type="url"
+          placeholder="https://your-tunnel.trycloudflare.com"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <div class="api-actions">
+          <button id="paste-api-url" class="text-button" type="button">
+            Paste
+          </button>
+          <button id="test-api" class="text-button" type="button">
+            Test connection
+          </button>
+        </div>
+        <p id="api-status" class="api-status" role="status"></p>
+        <p id="api-health-detail" class="form-note" role="status"></p>
+        <p id="mixed-content-warning" class="error-message" role="alert" hidden>
+          This HTTPS page cannot reach an HTTP server. The browser will block
+          it; use an HTTPS tunnel URL.
+        </p>
+        <details class="api-help">
+          <summary>How to start the API</summary>
+          <ol>
+            <li>
+              Open <code>vendor/cristopher.ipynb</code> and connect it to a
+              Colab runtime.
+            </li>
+            <li>
+              Run section 9 (Export) if you have not saved your trained model
+              yet.
+            </li>
+            <li>
+              Run Phase 3: Install and load, FastAPI app, background server,
+              then public tunnel. Wait for the public tests to print OK.
+            </li>
+            <li>Paste the printed HTTPS URL here and press Test connection.</li>
+            <li>
+              Keep Colab connected while playing. Paste the new URL whenever you
+              restart the tunnel.
+            </li>
+          </ol>
+          <p>
+            The web page cannot start Colab. The offline bot plays random legal
+            moves without any API. A localhost server runs on your computer, not
+            in Colab.
+          </p>
+        </details>
+        <div class="settings-toggles">
+          <label
+            >If the API fails, use the local fallback bot
+            <input id="api-fallback" type="checkbox" role="switch"
+          /></label>
+          <label
+            >Show engine info
+            <input id="engine-info-toggle" type="checkbox" role="switch"
+          /></label>
+        </div>
+      </fieldset>
       <button class="primary-button" data-close="settings-dialog">Done</button>
     </dialog>
     <dialog id="promotion-dialog" aria-labelledby="promotion-title">

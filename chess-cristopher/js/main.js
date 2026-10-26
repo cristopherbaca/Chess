@@ -1,7 +1,8 @@
 import { Chess } from "../vendor/chess.js";
+import { bindConnection } from "./ui/connection.js";
 import { Board } from "./board.js";
 import { CONFIG } from "./config.js";
-import { getCristopherMove, checkCristopherHealth } from "./cristopher.js";
+import { getCristopherMove, cancelCristopherMove } from "./cristopher.js";
 import {
   PIECE_NAMES,
   colorName,
@@ -26,6 +27,7 @@ import { soundNotes } from "./ui/sounds.js";
 const $ = (id) => document.getElementById(id);
 const state = {
   game: new Chess(),
+  started: false,
   opponent: "ai",
   humanColor: "w",
   difficulty: "medium",
@@ -38,8 +40,9 @@ const state = {
   requestId: 0,
   muted: false,
   audio: null,
-  healthBusy: false,
-  connection: "local",
+  engineInfo: null,
+  aiNotice: "",
+  cancelReady: false,
   renderedHistory: "",
   settings: loadSettings(),
   reviewPly: null,
@@ -73,6 +76,7 @@ function isAiTurn() {
 }
 function canPlay() {
   return (
+    state.started &&
     !state.busy &&
     !isOver() &&
     !isAiTurn() &&
@@ -161,11 +165,19 @@ function afterMove(move) {
 }
 
 async function requestAiMove() {
-  if (!isAiTurn() || isOver() || state.busy) return;
+  if (!state.started || !isAiTurn() || isOver() || state.busy) return;
   const requestId = ++state.requestId;
   const fen = state.game.fen();
   state.busy = true;
   state.aiError = "";
+  state.aiNotice = "";
+  state.cancelReady = false;
+  const cancelTimer = setTimeout(() => {
+    if (requestId === state.requestId && CONFIG.USE_API) {
+      state.cancelReady = true;
+      render();
+    }
+  }, 5000);
   render();
   try {
     const result = await getCristopherMove({
@@ -182,12 +194,24 @@ async function requestAiMove() {
       to: result.move.slice(2, 4),
       ...(result.move[4] ? { promotion: result.move[4] } : {}),
     });
+    state.engineInfo = result.info;
+    if (!result.info?.placeholder) connection.connected();
+    if (result.info?.placeholder && result.info?.fallback) {
+      state.aiNotice =
+        "API unavailable — the local fallback bot played this move.";
+      connection.disconnected();
+    }
     afterMove(move);
   } catch (error) {
     if (requestId !== state.requestId) return;
     state.aiError =
-      error.message || "Something interrupted Cristopher. Please try again.";
+      error.code === "cancelled"
+        ? error.message
+        : `Cristopher lost connection. ${error.message || "Please try again."}`;
+    if (["network", "timeout"].includes(error.code)) connection.disconnected();
+    else if (error.code !== "cancelled") void connection.refresh();
   } finally {
+    clearTimeout(cancelTimer);
     if (requestId === state.requestId) {
       state.busy = false;
       render();
@@ -197,6 +221,10 @@ async function requestAiMove() {
 
 function invalidateRequest() {
   state.requestId++;
+  cancelCristopherMove();
+  state.engineInfo = null;
+  state.aiNotice = "";
+  state.cancelReady = false;
   state.busy = false;
   state.aiError = "";
   state.selected = null;
@@ -204,6 +232,12 @@ function invalidateRequest() {
 }
 
 function currentStatus() {
+  if (!state.started)
+    return {
+      title: "Ready to play",
+      detail:
+        "Choose your opponent and press Play to start the game and clock.",
+    };
   if (state.timeout)
     return {
       title: `${colorName(otherColor(state.timeout))} wins`,
@@ -246,7 +280,9 @@ function render() {
   $("status-detail").textContent = state.busy
     ? "Cristopher is thinking…"
     : state.aiError
-      ? "Waiting for Cristopher. Retry when you’re ready."
+      ? state.aiError.startsWith("Move request cancelled")
+        ? "Request cancelled — retry when you’re ready."
+        : "Cristopher lost connection — retry or reconnect."
       : status.detail;
   $("status-icon").textContent = status.over
     ? "⚑"
@@ -254,6 +290,9 @@ function render() {
       ? "♔"
       : "♚";
   $("thinking").hidden = !state.busy;
+  $("cancel-ai").hidden = !state.busy || !state.cancelReady;
+  $("ai-notice").hidden = !state.aiNotice;
+  $("ai-notice").textContent = state.aiNotice;
   $("ai-error").hidden = !state.aiError;
   $("error-text").textContent = state.aiError;
   $("undo-button").disabled =
@@ -263,9 +302,13 @@ function render() {
     (state.opponent === "ai" &&
       state.humanColor === "b" &&
       history.length === 1);
-  $("resign-button").disabled = status.over || state.reviewPly !== null;
+  $("resign-button").disabled =
+    !state.started || status.over || state.reviewPly !== null;
   $("draw-button").disabled =
-    status.over || state.reviewPly !== null || state.opponent === "ai";
+    !state.started ||
+    status.over ||
+    state.reviewPly !== null ||
+    state.opponent === "ai";
   $("draw-button").title =
     state.opponent === "ai"
       ? "Draw offers are available in local games"
@@ -278,6 +321,7 @@ function render() {
     `${state.timeControl ? `${state.timeControl / 60} min` : "No clock"} · Casual game`;
   renderPlayer("top-player", otherColor(state.orientation));
   renderPlayer("bottom-player", state.orientation);
+  connection.paint();
   renderClocks(clock.value());
   renderHistory(history);
   renderMaterial(displayed);
@@ -292,27 +336,39 @@ function render() {
   }
 }
 
-function playerName(color) {
-  return state.opponent === "local"
-    ? color === "w"
-      ? "Player 1"
-      : "Player 2"
-    : color === state.humanColor
-      ? "You"
-      : "Cristopher";
-}
-
 function renderPlayer(id, color) {
   const element = $(id);
   const ai = state.opponent === "ai" && color !== state.humanColor;
   element.dataset.color = color;
-  element.querySelector(".player-name").textContent = playerName(color);
-  element.querySelector(".rating-chip").textContent = ai ? "AI" : "Unrated";
+  let chip = element.querySelector(".ai-connection");
+  if (!chip) {
+    chip = document.createElement("span");
+    chip.className = "ai-connection";
+    element.querySelector(".player-heading").append(chip);
+    const details = document.createElement("details");
+    details.className = "engine-info";
+    const summary = document.createElement("summary");
+    summary.textContent = "Engine info";
+    details.append(summary, document.createElement("span"));
+    element.querySelector(".player-description").after(details);
+  }
+  chip.hidden = !ai;
+  const details = element.querySelector(".engine-info");
+  const info = state.engineInfo;
+  details.hidden = !ai || !CONFIG.SHOW_ENGINE_INFO || !info || info.placeholder;
+  details.querySelector("span").textContent = info
+    ? [
+        Number.isFinite(info.eval)
+          ? `White: ${info.eval >= 0 ? "+" : ""}${info.eval.toFixed(2)}`
+          : null,
+        Number.isFinite(info.depth) ? `Depth ${info.depth}` : null,
+        Number.isFinite(info.time_ms) ? `${info.time_ms} ms` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
   const description = element.querySelector(".player-description");
-  description.textContent =
-    ai && state.busy
-      ? "Cristopher is thinking"
-      : `${colorName(color)}${ai ? " · Your chess partner" : ""}`;
+  description.textContent = ai && state.busy ? "Thinking…" : "";
   if (ai && state.busy) {
     const dots = document.createElement("span");
     dots.className = "thinking";
@@ -329,7 +385,7 @@ function renderPlayer(id, color) {
   element.querySelector(".material-advantage").id = `${prefix}-material`;
   element.classList.toggle(
     "active-player",
-    state.game.turn() === color && !isOver(),
+    state.started && state.game.turn() === color && !isOver(),
   );
 }
 
@@ -437,7 +493,7 @@ function showResult(status) {
     const ai = state.opponent === "ai" && color !== state.humanColor;
     $(`result-${prefix}-avatar`).innerHTML = avatarMarkup(ai);
     $(`result-${prefix}-avatar`).classList.toggle("human-avatar", !ai);
-    $(`result-${prefix}-name`).textContent = playerName(color);
+    $(`result-${prefix}-name`).textContent = colorName(color);
   }
   $("result-layer").hidden = false;
   $("close-result").focus({ preventScroll: true });
@@ -487,33 +543,15 @@ function playSound(move) {
   });
 }
 
-async function updateConnection() {
-  if (!CONFIG.USE_API || state.healthBusy) return;
-  state.healthBusy = true;
-  try {
-    await checkCristopherHealth();
-    state.connection = "online";
-  } catch {
-    state.connection = "offline";
-  } finally {
-    state.healthBusy = false;
-    renderConnection();
-  }
-}
-
-function renderConnection() {
-  $("connection").className = `connection ${state.connection}`;
-  $("connection").querySelector("span").textContent =
-    `Connection · ${{ local: "Local placeholder", checking: "Connecting…", online: "Online", offline: "Offline" }[state.connection]}`;
-}
-
 function startGame({ color, opponent, difficulty, time }) {
   invalidateRequest();
   state.game.reset();
+  state.started = true;
   state.humanColor =
     color === "random" ? (Math.random() < 0.5 ? "w" : "b") : color;
   state.orientation = state.humanColor;
   state.opponent = opponent;
+  connection.sync();
   state.difficulty = difficulty;
   state.timeControl = Number(time);
   state.resigned = null;
@@ -551,6 +589,7 @@ $("opponent").addEventListener("change", () => {
   });
   document.querySelector(".opponent-field .avatar").innerHTML =
     avatarMarkup(!local);
+  connection.sync();
 });
 for (const button of document.querySelectorAll("[data-difficulty]")) {
   button.addEventListener("click", () => {
@@ -562,9 +601,6 @@ for (const button of document.querySelectorAll("[data-difficulty]")) {
       );
   });
 }
-if (CONFIG.USE_API)
-  $("difficulty-note").textContent =
-    "Difficulty is sent to Cristopher with every move request.";
 $("undo-button").addEventListener("click", () => {
   if ($("undo-button").disabled) return;
   invalidateRequest();
@@ -612,7 +648,7 @@ $("confirm-draw").addEventListener("click", () => {
   }
 });
 $("retry-button").addEventListener("click", () => {
-  void updateConnection();
+  void connection.refresh();
   void requestAiMove();
 });
 $("history-first").addEventListener("click", () => reviewPosition(0));
@@ -643,16 +679,7 @@ $("rematch-button").addEventListener("click", () =>
     time: state.timeControl,
   }),
 );
-$("nav-play").addEventListener("click", () => {
-  showTab("new");
-  $("new-game-button").focus();
-});
-for (const id of [
-  "settings-button",
-  "board-settings-button",
-  "panel-settings-button",
-  "mobile-menu",
-])
+for (const id of ["settings-button", "reconnect-button"])
   $(id).addEventListener("click", () => $("settings-dialog").showModal());
 for (const button of document.querySelectorAll("[data-action]"))
   button.addEventListener("click", () => $(button.dataset.action).click());
@@ -693,14 +720,32 @@ document.addEventListener("keydown", (event) => {
     render();
   }
 });
-clock.start(state.timeControl);
+const connection = bindConnection(
+  (key) => {
+    if (!key || key === "USE_API") {
+      const pending = state.busy || Boolean(state.aiError);
+      invalidateRequest();
+      if (pending && isAiTurn() && !isOver())
+        state.aiError = "Connection settings changed. Retry when you’re ready.";
+    }
+    render();
+  },
+  {
+    isEnabled: () => CONFIG.USE_API && (state.started ? state.opponent : $("opponent").value) === "ai",
+    idleLabel: () => (state.started ? state.opponent : $("opponent").value) === "local"
+      ? "Local two-player · API inactive"
+      : "Offline mode · random bot (no API)",
+  },
+);
+$("cancel-ai").addEventListener("click", cancelCristopherMove);
+$("time-control").addEventListener("change", () => {
+  if (state.started) return;
+  state.timeControl = Number($("time-control").value);
+  clock.start(state.timeControl, null);
+  state.clockHistory = [clock.snapshot()];
+  render();
+});
+clock.start(state.timeControl, null);
 state.clockHistory = [clock.snapshot()];
 render();
-if (CONFIG.USE_API) {
-  state.connection = "checking";
-  renderConnection();
-  void updateConnection();
-  setInterval(() => {
-    if (!document.hidden) void updateConnection();
-  }, 30000);
-}
+connection.paint();

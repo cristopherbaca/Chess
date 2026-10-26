@@ -1,38 +1,66 @@
 import { Chess } from "../vendor/chess.js";
 import { CONFIG } from "./config.js";
 
-async function request(path, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    CONFIG.REQUEST_TIMEOUT_MS,
-  );
+export class CristopherError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "CristopherError";
+    this.code = code;
+  }
+}
+const activeMoves = new Set();
+export function cancelCristopherMove() {
+  for (const controller of activeMoves) controller.abort();
+}
+
+async function request(
+  path,
+  options = {},
+  timeoutMs = CONFIG.REQUEST_TIMEOUT_MS,
+  controller = new AbortController(),
+) {
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
     const response = await fetch(
       `${CONFIG.API_URL.replace(/\/+$/, "")}${path}`,
       {
         ...options,
-        headers: { ...options.headers, ...CONFIG.EXTRA_HEADERS },
+        headers: {
+          ...options.headers,
+          ...CONFIG.EXTRA_HEADERS,
+          "ngrok-skip-browser-warning": "true",
+        },
         signal: controller.signal,
       },
     );
     if (!response.ok)
-      throw new Error(
+      throw new CristopherError(
+        "http",
         `Cristopher's server returned HTTP ${response.status}. Please try again.`,
       );
     return await response.json();
   } catch (error) {
     if (controller.signal.aborted)
-      throw new Error("Cristopher took too long to respond. Please try again.");
-    if (error instanceof TypeError)
-      throw new Error(
-        "We couldn't reach Cristopher. Check the connection and try again.",
+      throw new CristopherError(
+        timedOut ? "timeout" : "cancelled",
+        timedOut
+          ? "Cristopher took too long to respond. Please try again."
+          : "Move request cancelled. Retry when you’re ready.",
       );
+    if (error instanceof CristopherError) throw error;
     if (error instanceof SyntaxError)
-      throw new Error(
+      throw new CristopherError(
+        "json",
         "Cristopher sent an unreadable response. Please try again.",
       );
-    throw error;
+    throw new CristopherError(
+      "network",
+      "We couldn't reach Cristopher. Check the connection and try again.",
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -42,38 +70,99 @@ export async function getCristopherMove({ fen, history, difficulty }) {
   const game = new Chess(fen);
   const legalMoves = game.moves({ verbose: true });
   if (game.isGameOver() || !legalMoves.length)
-    throw new Error("This position has no available move.");
+    throw new CristopherError(
+      "illegal",
+      "This position has no available move.",
+    );
+  const localMove = () => {
+    const move = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+    return `${move.from}${move.to}${move.promotion || ""}`;
+  };
   if (!CONFIG.USE_API) {
     await new Promise((resolve) =>
       setTimeout(resolve, 400 + Math.random() * 400),
     );
-    const move = legalMoves[Math.floor(Math.random() * legalMoves.length)];
-    return {
-      move: `${move.from}${move.to}${move.promotion || ""}`,
-      info: { placeholder: true },
-    };
+    return { move: localMove(), info: { placeholder: true } };
   }
-  const result = await request("/move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fen, history, difficulty }),
-  });
-  const legal =
-    typeof result?.move === "string" &&
-    /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(result.move) &&
-    legalMoves.some(
-      (move) => `${move.from}${move.to}${move.promotion || ""}` === result.move,
+  const controller = new AbortController();
+  activeMoves.add(controller);
+  try {
+    const result = await request(
+      "/move",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fen, history, difficulty }),
+      },
+      difficulty === "hard"
+        ? CONFIG.HARD_REQUEST_TIMEOUT_MS
+        : CONFIG.REQUEST_TIMEOUT_MS,
+      controller,
     );
-  if (!legal)
-    throw new Error(
-      "Cristopher returned an invalid move. Your board is safe. Please try again.",
-    );
-  return { move: result.move, info: result.info };
+    if (
+      typeof result?.move !== "string" ||
+      !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(result.move) ||
+      !legalMoves.some(
+        (move) =>
+          `${move.from}${move.to}${move.promotion || ""}` === result.move,
+      )
+    )
+      throw new CristopherError(
+        "illegal",
+        "Cristopher returned an invalid move. Your board is safe. Please try again.",
+      );
+    return { move: result.move, info: result.info };
+  } catch (error) {
+    if (CONFIG.AUTO_FALLBACK && error.code !== "cancelled")
+      return {
+        move: localMove(),
+        info: { placeholder: true, fallback: true, error: error.message },
+      };
+    throw error;
+  } finally {
+    activeMoves.delete(controller);
+  }
 }
 
+export async function checkHealth({ signal } = {}) {
+  const started = performance.now();
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
+  try {
+    const result = await request(
+      "/health",
+      { cache: "no-store" },
+      CONFIG.HEALTH_TIMEOUT_MS,
+      controller,
+    );
+    if (result?.status !== "ok")
+      throw new CristopherError("http", "Cristopher is not ready yet.");
+    return {
+      ok: true,
+      latency_ms: Math.round(performance.now() - started),
+      engine: result.engine || "cristopher",
+      version: result.version || "",
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      latency_ms: Math.round(performance.now() - started),
+      engine: null,
+      version: "",
+      error: error.message,
+    };
+  } finally {
+    signal?.removeEventListener("abort", abort);
+  }
+}
+
+// Preserve the existing health helper for integrations using its boolean contract.
 export async function checkCristopherHealth() {
   if (!CONFIG.USE_API) return true;
-  const result = await request("/health", { cache: "no-store" });
-  if (result?.status !== "ok") throw new Error("Cristopher is not ready yet.");
+  const result = await checkHealth();
+  if (!result.ok) throw new CristopherError("network", result.error);
   return true;
 }

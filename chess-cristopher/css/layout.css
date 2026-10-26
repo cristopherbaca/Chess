@@ -1,82 +1,6 @@
-.side-nav {
-  position: fixed;
-  inset: 0 auto 0 0;
-  width: 72px;
-  background: var(--bg-panel);
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  padding: 20px 6px;
-  z-index: 10;
-}
-.nav-brand {
-  color: white;
-  font-size: 37px;
-  font-weight: 900;
-  line-height: 1;
-  text-decoration: none;
-  margin: 0 0 32px;
-  letter-spacing: -4px;
-}
-.nav-brand span {
-  color: var(--accent);
-}
-.nav-item {
-  width: 60px;
-  height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 5px;
-  background: transparent;
-  border-radius: 6px;
-  color: var(--text-muted);
-  position: relative;
-  margin: 3px 0;
-}
-.nav-item > svg {
-  width: 27px;
-  height: 27px;
-}
-.nav-item > span {
-  font-size: 10px;
-  font-weight: 650;
-}
-.nav-item.active {
-  color: var(--accent);
-  background: #81b64c12;
-}
-.nav-item:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-.nav-item:disabled {
-  opacity: 0.3;
-}
-.nav-settings {
-  margin-top: auto;
-}
-[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 10px);
-  padding: 7px 12px;
-  background: #171614;
-  color: white;
-  border-radius: 4px;
-  white-space: nowrap;
-  font-size: 12px;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 20;
-}
-[data-tooltip]:hover::after,
-[data-tooltip]:focus-visible::after {
-  opacity: 1;
-}
 .workspace {
-  width: calc(100% - 72px);
-  margin-left: 72px;
+  width: 100%;
+  margin: 0 auto;
   padding: 40px 28px;
   display: grid;
   grid-template-columns: minmax(0, var(--board-size)) minmax(340px, 380px);
@@ -107,7 +31,7 @@
   align-items: center;
   gap: 7px;
 }
-.player-name {
+.player-color {
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
@@ -232,16 +156,6 @@
   font-size: 23px;
   font-weight: 800;
 }
-.brand-label {
-  margin-left: auto;
-  color: #cac8c5;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-.brand-label > span {
-  color: var(--accent);
-}
 .panel-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
@@ -321,6 +235,9 @@
   background: var(--accent);
   border-radius: 50%;
 }
+.connection.local i {
+  background: var(--text-muted);
+}
 .connection.offline i {
   background: #ff766c;
 }
@@ -359,9 +276,6 @@
   }
 }
 @media (max-width: 999px) {
-  .side-nav {
-    display: none;
-  }
   .workspace {
     width: 100%;
     margin: 0 auto;
@@ -397,7 +311,7 @@
   #bottom-player {
     padding: 10px;
   }
-  .player-name {
+  .player-color {
     font-size: 13px;
   }
   .rating-chip {

@@ -611,3 +611,87 @@ dialog p {
     transform: translateX(18px);
   }
 }
+
+/* API controls use the existing dialog, type, and color tokens. */
+.api-settings {
+  margin-top: 20px;
+}
+#api-url {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input, #202020);
+  color: inherit;
+  font: inherit;
+}
+.api-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+.api-status,
+.ai-connection {
+  color: var(--text-muted);
+}
+.api-status.online,
+.ai-connection.online {
+  color: #93c76c;
+}
+.api-status.offline,
+.ai-connection.offline {
+  color: #ef9292;
+}
+.ai-connection {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.engine-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.engine-info summary {
+  cursor: pointer;
+}
+#api-health-detail {
+  overflow-wrap: anywhere;
+}
+#settings-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.api-settings .settings-toggles label {
+  gap: 12px;
+}
+.api-settings input[type="checkbox"] {
+  flex-shrink: 0;
+}
+.ai-connection[hidden],
+.engine-info[hidden] {
+  display: none;
+}
+.player-strip:has(.engine-info:not([hidden])) {
+  height: auto;
+  min-height: 64px;
+}
+
+.api-help {
+  margin: 14px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.api-help summary {
+  cursor: pointer;
+  color: var(--text);
+}
+.api-help ol {
+  padding-left: 20px;
+}
+.api-help li {
+  margin: 8px 0;
+}

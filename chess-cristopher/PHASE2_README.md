@@ -90,19 +90,19 @@ Previous classic and neural checkpoints remain in their original directories. Th
 
 ## Notebook sections
 
-| Section | Purpose |
-| --- | --- |
-| 0 | GPU mode, three-hour budget, population, hardware/worker settings |
-| 1 | GPU check, packages, Drive, compiler, Stockfish |
-| 2 | JavaScript baseline and legality check |
-| 3 | Classic evaluation definitions, also supplying the GPU prior |
-| 4 | Classic search definitions; not the GPU training search body |
-| 5 | Classic definitions plus CUDA population, CPU preparation and worker setup |
-| 6 | Start/resume the selected training mode; plot progress |
-| 7 | Load a saved model; optional independent final evaluation |
-| 8 | Legacy NumPy stage 2; skipped in GPU mode |
-| 9 | Export the selected model and verify it in a fresh process |
-| 10 | Optional SVG quick play |
+| Section | Purpose                                                                    |
+| ------- | -------------------------------------------------------------------------- |
+| 0       | GPU mode, three-hour budget, population, hardware/worker settings          |
+| 1       | GPU check, packages, Drive, compiler, Stockfish                            |
+| 2       | JavaScript baseline and legality check                                     |
+| 3       | Classic evaluation definitions, also supplying the GPU prior               |
+| 4       | Classic search definitions; not the GPU training search body               |
+| 5       | Classic definitions plus CUDA population, CPU preparation and worker setup |
+| 6       | Start/resume the selected training mode; plot progress                     |
+| 7       | Load a saved model; optional independent final evaluation                  |
+| 8       | Legacy NumPy stage 2; skipped in GPU mode                                  |
+| 9       | Export the selected model and verify it in a fresh process                 |
+| 10      | Optional SVG quick play                                                    |
 
 `QUICK_TEST=True` selects a smaller GPU population/network and shorter session for checking the pipeline. CUDA is still required by default. The full GPU run does not automatically execute the old CPU-only stage-2 prototype.
 

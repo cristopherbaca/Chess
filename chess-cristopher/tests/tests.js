@@ -1,9 +1,21 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG } from "../js/config.js";
-import { getCristopherMove, checkCristopherHealth } from "../js/cristopher.js";
+import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js";
+import {
+  getCristopherMove,
+  checkCristopherHealth,
+  checkHealth,
+  cancelCristopherMove,
+  CristopherError,
+} from "../js/cristopher.js";
 import { gameStatus, materialSummary, toUci, undoTurn } from "../js/game.js";
 import { ChessClock, formatTime } from "../js/ui/clock.js";
 
+const suiteConfig = { ...CONFIG };
+Object.assign(CONFIG, {
+  USE_API: false,
+  API_URL: "http://localhost:8000",
+  AUTO_FALLBACK: false,
+});
 const results = [];
 const assert = (condition, message = "Assertion failed") => {
   if (!condition) throw new Error(message);
@@ -185,6 +197,91 @@ await test("Network, HTTP, malformed JSON, and timeout failures are friendly", a
     );
   await rejects(() => getCristopherMove(input), "too long");
 });
+await test("Hard has its own timeout, cancellation is typed, and fallback is opt-in", async () => {
+  const saved = { ...CONFIG };
+  try {
+    CONFIG.AUTO_FALLBACK = false;
+    CONFIG.REQUEST_TIMEOUT_MS = 2;
+    CONFIG.HARD_REQUEST_TIMEOUT_MS = 40;
+    globalThis.fetch = (_url, { signal }) =>
+      new Promise((_resolve, reject) =>
+        signal.addEventListener("abort", () =>
+          reject(new DOMException("Aborted", "AbortError")),
+        ),
+      );
+    let start = performance.now();
+    try {
+      await getCristopherMove({ ...input, difficulty: "hard" });
+      throw new Error("Expected timeout");
+    } catch (error) {
+      assert(error instanceof CristopherError && error.code === "timeout");
+    }
+    assert(
+      performance.now() - start >= 30,
+      "Hard must use its separate timeout",
+    );
+    const pending = getCristopherMove({ ...input, difficulty: "hard" });
+    cancelCristopherMove();
+    try {
+      await pending;
+      throw new Error("Expected cancel");
+    } catch (error) {
+      assert(error.code === "cancelled");
+    }
+    CONFIG.AUTO_FALLBACK = true;
+    globalThis.fetch = async () => {
+      throw new TypeError("offline");
+    };
+    const result = await getCristopherMove(input);
+    assert(result.info.placeholder && result.info.fallback);
+    assert(
+      new Chess()
+        .moves({ verbose: true })
+        .some((m) => toUci(m) === result.move),
+    );
+  } finally {
+    Object.assign(CONFIG, saved);
+  }
+});
+await test("Health identity, error results, URL normalization, and mixed content", async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        status: "ok",
+        engine: "cristopher",
+        version: "test-v1",
+      }),
+    );
+  const health = await checkHealth();
+  assert(
+    health.ok &&
+      health.engine === "cristopher" &&
+      health.version === "test-v1" &&
+      health.latency_ms >= 0,
+  );
+  globalThis.fetch = async () => new Response("{bad");
+  assert(!(await checkHealth()).ok);
+  assert(
+    normalizeApiUrl("  https://example.com/// ") === "https://example.com",
+  );
+  for (const url of [
+    "ftp://example.com",
+    "javascript:alert(1)",
+    "hello",
+    "https://user:secret@example.com",
+  ]) {
+    let rejected = false;
+    try {
+      normalizeApiUrl(url);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, url);
+  }
+  assert(hasMixedContent("http://example.com", "https:"));
+  assert(!hasMixedContent("http://localhost:8000", "https:"));
+  assert(!hasMixedContent("https://example.com", "https:"));
+});
 Object.assign(CONFIG, originalConfig);
 globalThis.fetch = originalFetch;
 
@@ -194,6 +291,19 @@ await until(
   "application to load",
 );
 const doc = frame.contentDocument;
+const frameConfigUrl = new URL("../js/config.js", import.meta.url).href;
+const frameConfig = (
+  await frame.contentWindow.eval(`import(${JSON.stringify(frameConfigUrl)})`)
+).CONFIG;
+const frameOriginalConfig = { ...frameConfig };
+Object.assign(frameConfig, {
+  USE_API: false,
+  API_URL: "http://localhost:8000",
+  AUTO_FALLBACK: false,
+});
+doc.getElementById("use-api").checked = false;
+doc.getElementById("api-fallback").checked = false;
+doc.getElementById("api-url").value = frameConfig.API_URL;
 const click = (id) => doc.getElementById(id).click();
 const square = (name) => doc.querySelector(`[data-square="${name}"]`);
 const move = (from, to) => {
@@ -207,6 +317,23 @@ function newGame(opponent = "local", color = "w") {
   doc.getElementById("opponent").dispatchEvent(new Event("change"));
   doc.getElementById("new-game-form").requestSubmit();
 }
+
+await test("Before Play, the clock stays paused and the interface has one Settings button", async () => {
+  assert(doc.getElementById("game-status").textContent === "Ready to play");
+  assert(!doc.querySelector(".side-nav, .player-name, .brand-label"));
+  assert(doc.querySelectorAll('[aria-label="Open settings"]').length === 1);
+  assert(!doc.querySelector(".player-clock.running"));
+  const before = [...doc.querySelectorAll(".player-clock span")].map(el => el.textContent).join();
+  move("e2", "e4");
+  await sleep(1150);
+  assert(doc.getElementById("move-count").textContent === "0 played");
+  assert([...doc.querySelectorAll(".player-clock span")].map(el => el.textContent).join() === before);
+  doc.getElementById("time-control").value = "180";
+  doc.getElementById("time-control").dispatchEvent(new frame.contentWindow.Event("change"));
+  assert([...doc.querySelectorAll(".player-clock span")].every(el => el.textContent === "3:00"));
+  assert(!doc.querySelector(".player-clock.running"));
+  doc.getElementById("time-control").value = "600";
+});
 
 await test("UI click selection, legal dots, illegal destination, and last move", () => {
   newGame();
@@ -422,7 +549,7 @@ await test("UI API failure preserves board, Retry succeeds, resignation invalida
       "retry",
     );
     assert(doc.getElementById("ai-error").hidden);
-    assert(doc.getElementById("connection").textContent.includes("Online"));
+    assert(doc.getElementById("connection").textContent.includes("Connected"));
   } finally {
     config.USE_API = false;
     frame.contentWindow.fetch = savedFetch;
@@ -469,7 +596,7 @@ await test("Settings apply board themes and display preferences and persist them
   const originalTheme = doc.documentElement.dataset.boardTheme;
   const ids = ["coordinates-toggle", "legal-toggle", "highlights-toggle"];
   const originalValues = ids.map((id) => doc.getElementById(id).checked);
-  click("board-settings-button");
+  click("settings-button");
   try {
     doc.querySelector('[name="board-theme"][value="blue"]').click();
     assert(doc.documentElement.dataset.boardTheme === "blue");
@@ -598,6 +725,169 @@ await test("No clock mode and actual clock displays track the moving side", () =
   );
   doc.getElementById("time-control").value = "600";
 });
+await test("Connection Settings save URL, show identity and engine info, recover and stay offline", async () => {
+  const configUrl = new URL("../js/config.js", import.meta.url).href;
+  const config = (
+    await frame.contentWindow.eval(`import(${JSON.stringify(configUrl)})`)
+  ).CONFIG;
+  const saved = { ...config },
+    savedFetch = frame.contentWindow.fetch;
+  const storage = ["apiUrl", "useApi", "autoFallback", "showEngineInfo"].map(
+    (key) => [key, frame.contentWindow.localStorage.getItem(`chess.${key}`)],
+  );
+  try {
+    newGame("ai");
+    click("settings-button");
+    frame.contentWindow.fetch = async (url) =>
+      new Response(
+        JSON.stringify(
+          url.endsWith("/health")
+            ? { status: "ok", engine: "cristopher", version: "test-v2" }
+            : { move: "e7e5", info: { eval: -0.35, depth: 3, time_ms: 120 } },
+        ),
+      );
+    const url = doc.getElementById("api-url");
+    url.value = "  https://example.com/// ";
+    url.dispatchEvent(new frame.contentWindow.Event("change"));
+    if (!doc.getElementById("use-api").checked) click("use-api");
+    click("test-api");
+    await until(
+      () => doc.getElementById("api-status").textContent.includes("Connected"),
+      "connection test",
+    );
+    assert(config.API_URL === "https://example.com");
+    assert(
+      frame.contentWindow.localStorage.getItem("chess.apiUrl") ===
+        "https://example.com",
+    );
+    assert(
+      doc.getElementById("api-health-detail").textContent.includes("test-v2"),
+    );
+    if (!doc.getElementById("engine-info-toggle").checked)
+      click("engine-info-toggle");
+    doc.getElementById("settings-dialog").close();
+    move("e2", "e4");
+    await until(
+      () => doc.getElementById("move-count").textContent === "2 played",
+      "API move",
+    );
+    assert(!doc.querySelector("#top-player .engine-info").hidden);
+    assert(
+      doc
+        .querySelector("#top-player .engine-info")
+        .textContent.includes("-0.35"),
+    );
+    click("undo-button");
+    frame.contentWindow.fetch = async () => {
+      throw new TypeError("server stopped");
+    };
+    move("e2", "e4");
+    await until(() => !doc.getElementById("ai-error").hidden, "friendly error");
+    assert(
+      doc
+        .getElementById("error-text")
+        .textContent.includes("Cristopher lost connection"),
+    );
+    assert(!doc.getElementById("undo-button").disabled);
+    click("reconnect-button");
+    assert(doc.getElementById("settings-dialog").open);
+    click("use-api");
+    doc.getElementById("settings-dialog").close();
+    click("retry-button");
+    await until(
+      () => doc.getElementById("move-count").textContent === "2 played",
+      "offline retry",
+    );
+    assert(
+      doc.getElementById("api-status").textContent.includes("Offline mode"),
+    );
+  } finally {
+    Object.assign(config, saved);
+    frame.contentWindow.fetch = savedFetch;
+    doc.getElementById("settings-dialog").close();
+    for (const [key, value] of storage) {
+      if (value === null)
+        frame.contentWindow.localStorage.removeItem(`chess.${key}`);
+      else frame.contentWindow.localStorage.setItem(`chess.${key}`, value);
+    }
+  }
+});
+await test("Health polling uses 20 seconds and stops while the tab is hidden", async () => {
+  const w = frame.contentWindow;
+  const savedFetch = w.fetch,
+    savedSet = w.setInterval,
+    savedClear = w.clearInterval;
+  const originalUse = frameConfig.USE_API;
+  const scheduled = new Map();
+  let calls = 0;
+  try {
+    frameConfig.USE_API = true;
+    newGame("ai");
+    w.fetch = async () => {
+      calls++;
+      return new Response(JSON.stringify({ status: "ok" }));
+    };
+    w.setInterval = (fn, ms) => {
+      const id = savedSet.call(w, fn, ms);
+      scheduled.set(id, ms);
+      return id;
+    };
+    w.clearInterval = (id) => {
+      scheduled.delete(id);
+      savedClear.call(w, id);
+    };
+    Object.defineProperty(doc, "hidden", { configurable: true, value: false });
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    await until(() => calls > 0, "visible health ping");
+    assert([...scheduled.values()].includes(20000));
+    Object.defineProperty(doc, "hidden", { configurable: true, value: true });
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    assert(scheduled.size === 0, "Hidden tab must clear its health timer");
+    const before = calls;
+    await sleep(50);
+    assert(calls === before);
+    Object.defineProperty(doc, "hidden", { configurable: true, value: false });
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    await until(() => calls > before, "visible tab resumes immediately");
+  } finally {
+    frameConfig.USE_API = false;
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    delete doc.hidden;
+    frameConfig.USE_API = originalUse;
+    w.fetch = savedFetch;
+    w.setInterval = savedSet;
+    w.clearInterval = savedClear;
+  }
+});
+await test("Local games stop API checks; confirmed connection stays visible during refresh", async () => {
+  const w = frame.contentWindow, savedFetch = w.fetch;
+  let calls = 0, resolveHealth;
+  try {
+    frameConfig.USE_API = true;
+    w.fetch = async () => { calls++; return new Response(JSON.stringify({ status: "ok", engine: "test" })); };
+    newGame("local");
+    const before = calls;
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    await sleep(60);
+    assert(calls === before, "Local game must not ping even with server toggle on");
+    assert(doc.getElementById("connection").textContent.includes("API inactive"));
+    newGame("ai");
+    await until(() => doc.getElementById("connection").textContent.includes("Connected"), "AI connection");
+    w.fetch = () => new Promise(resolve => { resolveHealth = resolve; });
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    assert(doc.getElementById("connection").textContent.includes("Connected"), "Background checks must not replace Connected with Connecting");
+    resolveHealth(new Response(JSON.stringify({ status: "ok" })));
+    await sleep(50);
+    newGame("local");
+    assert(doc.getElementById("connection").textContent.includes("API inactive"));
+  } finally {
+    frameConfig.USE_API = false;
+    newGame("local");
+    w.fetch = savedFetch;
+  }
+});
+Object.assign(CONFIG, suiteConfig);
+Object.assign(frameConfig, frameOriginalConfig);
 const passed = results.filter((result) => result.pass).length;
 document.getElementById("summary").textContent =
   `${passed}/${results.length} checks passed`;
