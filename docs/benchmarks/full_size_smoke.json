@@ -1,0 +1,39 @@
+{
+  "scope": "CPU compatibility smoke with freshly initialized 14,828,801-parameter weights; not the user champion or CUDA benchmark",
+  "torch": "2.8.0",
+  "parameters": 14828801,
+  "search_version": "terminal-aware-beam-1",
+  "results": [
+    {
+      "difficulty": "easy",
+      "move": "a2a4",
+      "info": {
+        "eval": 13.0,
+        "depth": 1,
+        "nodes": 20,
+        "time_ms": 30
+      }
+    },
+    {
+      "difficulty": "medium",
+      "move": "a2a4",
+      "info": {
+        "eval": 10.0,
+        "depth": 2,
+        "nodes": 100,
+        "time_ms": 32
+      }
+    },
+    {
+      "difficulty": "hard",
+      "move": "a2a4",
+      "info": {
+        "eval": 13.0,
+        "depth": 3,
+        "nodes": 1460,
+        "time_ms": 306
+      }
+    }
+  ],
+  "mate_branch_score": -30000.0
+}

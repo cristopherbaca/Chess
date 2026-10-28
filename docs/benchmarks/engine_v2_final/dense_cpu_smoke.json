@@ -1,0 +1,84 @@
+{
+  "parameters": 14828801,
+  "networks_in_bank": 1,
+  "device": "cpu",
+  "trained_weights": false,
+  "results": [
+    {
+      "difficulty": "easy",
+      "seconds": 0.029293125000000142,
+      "move": "a2a4",
+      "info": {
+        "eval": 13.0,
+        "depth": 1,
+        "nodes": 20,
+        "time_ms": 29
+      }
+    },
+    {
+      "difficulty": "medium",
+      "seconds": 0.5031524589999998,
+      "move": "h2h4",
+      "info": {
+        "eval": 10.0,
+        "depth": 2,
+        "nodes": 220,
+        "time_ms": 502,
+        "pv": [
+          "h2h4",
+          "g8f6"
+        ],
+        "search_version": "shared-alpha-beta-v2",
+        "search_stats": {
+          "nodes": 220,
+          "qnodes": 180,
+          "eval_calls": 152,
+          "eval_seconds": 0.47448832999999757,
+          "movegen_seconds": 0.011301514000004342,
+          "tt_probes": 40,
+          "pvs_researches": 9,
+          "eval_cache_hits": 28,
+          "tt_hits": 4,
+          "beta_cutoffs": 32,
+          "elapsed_seconds": 0.5027494580000003,
+          "tt_entries": 36,
+          "nps": 437.5937089523424,
+          "tt_hit_rate": 0.1
+        }
+      }
+    },
+    {
+      "difficulty": "hard",
+      "seconds": 2.504156875,
+      "move": "h2h4",
+      "info": {
+        "eval": 13.0,
+        "depth": 3,
+        "nodes": 895,
+        "time_ms": 2503,
+        "pv": [
+          "h2h4",
+          "h7h5",
+          "f2f4"
+        ],
+        "search_version": "shared-alpha-beta-v2",
+        "search_stats": {
+          "nodes": 895,
+          "qnodes": 755,
+          "eval_calls": 678,
+          "eval_seconds": 2.3764585040000052,
+          "movegen_seconds": 0.05319824700000897,
+          "tt_probes": 140,
+          "tt_hits": 71,
+          "pvs_researches": 1,
+          "beta_cutoffs": 67,
+          "eval_cache_hits": 77,
+          "elapsed_seconds": 2.503786416,
+          "tt_entries": 104,
+          "nps": 357.45860520716235,
+          "tt_hit_rate": 0.5071428571428571
+        }
+      }
+    }
+  ]
+}

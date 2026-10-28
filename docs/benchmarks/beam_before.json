@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-27T13:38:56.545683+00:00",
+  "engine_source_sha256": "2aabeecb806c9e873bcda98d7fe68546c1e7e7d6fc40f7a36831f8cffed3d929",
+  "fixture_sha256": "e68f0a88d1a3ded696ed0cae8a4f4a51618783ec698395d1a7a338a0770705c6",
+  "python": "3.9.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "chess": "1.11.2",
+  "numpy": "2.0.2",
+  "repeats": 3,
+  "evaluator": "fixed material/PST prior + terminal rules; no neural weights",
+  "limitations": "CPU traversal microbenchmark; not CUDA throughput, match strength or Elo.",
+  "search": [
+    {
+      "name": "smothered_mate_reply",
+      "fen": "5r1k/6pp/7N/8/8/8/8/KQ6 b - - 0 1",
+      "branch": "f8g8",
+      "mate_reply": "h6f7",
+      "depth": 2,
+      "beam": 4,
+      "best_move": "g7h6",
+      "completed_depth": 2,
+      "evaluated_positions": 78,
+      "median_ms": 8.254499999999998,
+      "samples_ms": [
+        9.13891600000001,
+        8.232292000000003,
+        8.254499999999998
+      ],
+      "evaluated_positions_per_second": 9449.391241141198,
+      "branch_score": -969.0,
+      "recognizes_forced_mate_reply": false
+    },
+    {
+      "name": "quiet_queen_mate_reply",
+      "fen": "7k/R7/3Bq3/1pb5/8/b7/8/5Q1K b - - 0 1",
+      "branch": "h8g8",
+      "mate_reply": "f1f8",
+      "depth": 2,
+      "beam": 8,
+      "best_move": "c5a7",
+      "completed_depth": 2,
+      "evaluated_positions": 294,
+      "median_ms": 29.173332999999996,
+      "samples_ms": [
+        29.606167000000017,
+        29.173332999999996,
+        29.009624999999982
+      ],
+      "evaluated_positions_per_second": 10077.696641655584,
+      "branch_score": -371.5,
+      "recognizes_forced_mate_reply": false
+    },
+    {
+      "name": "initial_medium",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "depth": 2,
+      "beam": 4,
+      "best_move": "a2a4",
+      "completed_depth": 2,
+      "evaluated_positions": 100,
+      "median_ms": 18.125749999999996,
+      "samples_ms": [
+        18.100915999999994,
+        18.125749999999996,
+        18.255083000000006
+      ],
+      "evaluated_positions_per_second": 5517.013089113555
+    },
+    {
+      "name": "kiwipete_hard",
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "depth": 3,
+      "beam": 8,
+      "best_move": "e2a6",
+      "completed_depth": 3,
+      "evaluated_positions": 3494,
+      "median_ms": 951.5052500000003,
+      "samples_ms": [
+        945.796709,
+        953.5551250000001,
+        951.5052500000003
+      ],
+      "evaluated_positions_per_second": 3672.076428374934
+    }
+  ],
+  "perft": [
+    {
+      "name": "initial",
+      "depth": 4,
+      "nodes": 197281,
+      "ms": 286.27554200000026,
+      "nodes_per_second": 689129.7755363251
+    },
+    {
+      "name": "kiwipete",
+      "depth": 3,
+      "nodes": 97862,
+      "ms": 110.9743329999997,
+      "nodes_per_second": 881843.5520581165
+    }
+  ]
+}

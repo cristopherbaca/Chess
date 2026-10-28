@@ -1,0 +1,84 @@
+/private/tmp/chess-engine-venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+test_concurrent_calls_are_serialized (test_api.ApiTests) ... ok
+test_cors_on_success_and_errors (test_api.ApiTests) ... ok
+test_deadline_releases_lock_and_preserves_budget (test_api.ApiTests) ... ok
+test_errors (test_api.ApiTests) ... ok
+test_health_and_legal_moves_all_difficulties (test_api.ApiTests) ... ok
+test_history_and_repetition (test_api.ApiTests) ... ok
+test_illegal_fallback_and_eval_perspective (test_api.ApiTests) ... ok
+test_native_timeout_retains_lock_and_health_responds (test_api.ApiTests) ... ok
+test_ring_buffer_and_counters (test_api.ApiTests) ... ok
+test_deployment_cells_serve_classical_and_sparse (test_artifacts.ArtifactTests) ... ok
+test_publication_requires_matching_current_validation (test_artifacts.ArtifactTests) ... ok
+test_standalone_classical_and_sparse_exports (test_artifacts.ArtifactTests) ... ok
+test_run_all_returns_url_keeps_server_alive_and_can_rerun (test_deployment_flow.DeploymentRunAllTest) ... API ready: /health, /move, /stats
+macOS-26.6.2-arm64-arm-64bit | Python 3.9.6
+Resources | 8 available CPU cores | 8 workers | RAM: availability not detected
+GPU: no NVIDIA device detected; CPU evolution remains available.
+GPU neuroevolution uses CUDA in the training step; classic mode remains CPU-based.
+Mode: gpu_neuroevolution | FULL TRAINING
+Session budget: 2.5 hours. Run all again to resume this run.
+Network: 784 → 4608 → 2432 → 1 | 14,828,801 parameters
+Champion saved to Drive | generation -1 | af718bf9ebab85d4-3f1f27c1
+ok
+test_castling_through_check_is_illegal (test_engine.EngineRulesTests) ... ok
+test_classical_node_budget_returns_legal_move (test_engine.EngineRulesTests) ... ok
+test_classical_search_finds_mate_and_restores_input (test_engine.EngineRulesTests) ... ok
+test_en_passant_cannot_expose_king (test_engine.EngineRulesTests) ... ok
+test_reference_perft_and_board_restoration (test_engine.EngineRulesTests) ... ok
+test_special_moves_make_unmake_hash_and_counts (test_engine.EngineRulesTests) ... ok
+test_terminal_scores_and_repetition_history (test_engine.EngineRulesTests) ... ok
+test_checked_position_keeps_every_legal_evasion (test_engine.NeuralSearchTests) ... ok
+test_deadline_during_child_generation_does_not_mutate_board (test_engine.NeuralSearchTests) ... ok
+test_expired_budget_keeps_completed_iteration (test_engine.NeuralSearchTests) ... ok
+test_forced_mate_replies_survive_beam_pruning_both_colors (test_engine.NeuralSearchTests) ... ok
+test_quiet_position_still_obeys_beam_limit (test_engine.NeuralSearchTests) ... ok
+test_terminal_draws_and_mates_survive_narrow_beam (test_engine.NeuralSearchTests) ... ok
+test_mirror_symmetry_and_material (test_evaluators.EvaluationTests) ... ok
+test_pawn_terms_have_sensible_direction (test_evaluators.EvaluationTests) ... ok
+test_serialization_and_hybrid (test_evaluators.EvaluationTests) ... ok
+test_tapered_king_activity (test_evaluators.EvaluationTests) ... ok
+test_incremental_matches_full_refresh_and_unmake (test_evaluators.SparseNetworkTests) ... ok
+test_labeled_training_checkpoint_and_resume (test_evaluators.SparseNetworkTests) ... ok
+test_quantization_and_model_roundtrip (test_evaluators.SparseNetworkTests) ... ok
+test_bad_snapshot_republished_before_reuse (test_notebooks.NotebookTests) ... ok
+test_classic_generation_winner_is_published (test_notebooks.NotebookTests) ... ok
+test_failed_publication_keeps_previous_champion_and_recovers_from_checkpoint (test_notebooks.NotebookTests) ... ok
+test_initial_champion_and_changed_champion_load_without_training (test_notebooks.NotebookTests) ... ok
+test_interrupted_checkpoint_and_corrupt_latest_recover_previous (test_notebooks.NotebookTests) ... ok
+test_new_search_options_do_not_change_old_gpu_checkpoint_identity (test_notebooks.NotebookTests) ... ok
+test_notebooks_are_compact_hidden_and_separate (test_notebooks.NotebookTests) ... ok
+test_parameter_mode_export_is_standalone_and_legal (test_notebooks.NotebookTests) ... ok
+test_real_cpu_evolution_saves_and_resumes (test_notebooks.NotebookTests) ... ok
+test_recoverable_exception_saves_in_progress_state (test_notebooks.NotebookTests) ... ok
+test_unchanged_champion_does_not_duplicate_bundles (test_notebooks.NotebookTests) ... ok
+test_fifty_moves_and_insufficient_material (test_search_core.SearchCoreTests) ... ok
+test_history_changes_transposition_identity (test_search_core.SearchCoreTests) ... ok
+test_incremental_hash_random_make_unmake (test_search_core.SearchCoreTests) ... ok
+test_mate_stalemate_and_input_preservation (test_search_core.SearchCoreTests) ... ok
+test_null_disabled_in_pawn_endgame (test_search_core.SearchCoreTests) ... ok
+test_pinned_en_passant_does_not_prevent_repetition (test_search_core.SearchCoreTests) ... ok
+test_pvs_aspiration_and_ordering_match_plain_alpha_beta (test_search_core.SearchCoreTests) ... ok
+test_quiescence_rejects_poisoned_capture (test_search_core.SearchCoreTests) ... ok
+test_see_recapture_and_pinned_attacker (test_search_core.SearchCoreTests) ... ok
+test_selective_features_individually_preserve_forced_mate (test_search_core.SearchCoreTests) ... ok
+test_selective_heuristics_actually_execute (test_search_core.SearchCoreTests) ... ok
+test_special_move_and_null_hash (test_search_core.SearchCoreTests) ... ok
+test_stop_and_node_limits_and_tt_capacity (test_search_core.SearchCoreTests) ... ok
+test_gpu_and_parameter_cells_run_sequentially_and_resume (test_training_flow.TrainingFlowTests) ... ok
+test_draws_small_samples_and_missing_pairs_never_promote (test_training_matches_uci.EvidenceTests) ... ok
+test_match_resume_and_config_guard (test_training_matches_uci.EvidenceTests) ... ok
+test_paired_openings_are_reproducible_and_legal (test_training_matches_uci.EvidenceTests) ... ok
+test_strong_complete_result_promotes_with_uncertainty (test_training_matches_uci.EvidenceTests) ... ok
+test_real_generation_checkpoint_and_incumbent_preservation (test_training_matches_uci.GeneticsTests) ... ok
+test_reproducible_crossover_mutation_and_elitism (test_training_matches_uci.GeneticsTests) ... ok
+test_invalid_position_keeps_previous_board (test_training_matches_uci.UciTests) ... ok
+test_protocol_ready_position_go_stop_quit (test_training_matches_uci.UciTests) ... ok
+test_real_uci_process_can_be_used_as_benchmark_opponent (test_training_matches_uci.UciTests) ... ok
+
+----------------------------------------------------------------------
+Ran 67 tests in 18.492s
+
+OK
+PASS: all deployment cells, local self-tests, simulated public checks, URL output, rerun and shutdown

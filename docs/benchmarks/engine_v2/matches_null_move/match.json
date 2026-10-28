@@ -1,0 +1,16 @@
+{
+  "signature": "80a312fedef9a6467396f2e1f86a3d63189dab3517ca7d3f022b9c26928e0f1f",
+  "candidate": "97d98bfd467d8f068f2236772ac47ff89d9e3d5602f941a151fde2d024b6ad01null_move",
+  "incumbent": "97d98bfd467d8f068f2236772ac47ff89d9e3d5602f941a151fde2d024b6ad01baseline",
+  "config": {
+    "pairs": 1,
+    "seed": 8021,
+    "move_seconds": 0.005,
+    "nodes": 32,
+    "depth": 64,
+    "base_seconds": 30,
+    "increment": 0.1,
+    "max_plies": 100,
+    "opening_plies": 6
+  }
+}

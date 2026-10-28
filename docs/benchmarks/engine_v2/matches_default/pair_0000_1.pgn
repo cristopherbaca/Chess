@@ -1,0 +1,11 @@
+[Event "Chess controlled match"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "?"]
+[Black "?"]
+[Result "1/2-1/2"]
+[Termination "terminal rules"]
+
+1. h3 a5 2. d4 h6 3. Kd2 h5 4. a3 a4 5. Ra2 Ra5 6. Ra1 Ra6 7. Ra2 Ra5 8. Ra1 Ra6 9. Ra2 Ra5 1/2-1/2
+

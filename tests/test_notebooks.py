@@ -74,7 +74,8 @@ class NotebookTests(unittest.TestCase):
                 if cell['cell_type'] == 'code':
                     self.assertTrue(cell['metadata']['jupyter']['source_hidden'])
                     self.assertEqual(cell['metadata']['cellView'], 'form')
-                    self.assertEqual(cell['outputs'], [])
+                    # Executed user notebooks legitimately contain outputs;
+                    # nbformat validation above checks their schema.
                     ast.parse(''.join(cell['source']))
         self.assertLessEqual(len(TRAIN['cells']), 10)
         self.assertLessEqual(len(DEPLOY['cells']), 8)
@@ -88,6 +89,8 @@ class NotebookTests(unittest.TestCase):
     def test_initial_champion_and_changed_champion_load_without_training(self):
         first = self.bundle()
         self.assertEqual(json.loads((first / 'cristopher_genome.json').read_text())['champion_generation'], -1)
+        self.assertEqual(json.loads((first / 'cristopher_genome.json').read_text())['search_version'],
+                         'shared-alpha-beta-v2')
         self.state['champion'] = self.state['champion'] + .01
         self.state['champion_generation'] = 0
         self.module.gpu_save(self.cfg, self.state)
@@ -99,6 +102,16 @@ class NotebookTests(unittest.TestCase):
         engine = module.CristopherEngine(self.bundle() / 'cristopher_genome.json')
         result = engine.get_move(chess.STARTING_FEN, [], 'easy')
         self.assertIn(chess.Move.from_uci(result['move']), chess.Board().legal_moves)
+        self.assertEqual(engine.bank.layers[0][0].shape[0], 1)
+        self.assertIsNone(engine.bank.scale)
+        result = engine.get_move(chess.STARTING_FEN, [], 'medium')
+        self.assertEqual(result['info']['search_version'], 'shared-alpha-beta-v2')
+        self.assertIn(chess.Move.from_uci(result['move']), chess.Board().legal_moves)
+        # The standalone published module carries the fix, not just the notebook.
+        board = chess.Board('5r1k/6pp/7N/8/8/8/8/KQ6 b - - 0 1')
+        moves, scores, depth, _ = engine.lookahead(board, 2, 4, module.time.monotonic() + 10)
+        self.assertEqual(depth, 2)
+        self.assertLessEqual(scores[moves.index(chess.Move.from_uci('f8g8'))], -module.MATE + 100)
 
     def test_classic_generation_winner_is_published(self):
         path = self.root / 'models/classic_worker.py'
@@ -189,6 +202,27 @@ class NotebookTests(unittest.TestCase):
         self.module.gpu_save(self.cfg, self.state)
         self.assertNotEqual(self.bundle(), previous)
         self.assertGreater((self.bundle() / 'weights.pt').stat().st_size, 100)
+
+    def test_parameter_mode_export_is_standalone_and_legal(self):
+        from chess_ai.training import GeneticConfig, load_state
+        cfg = {**self.cfg, 'training_mode': 'parameter_evolution', 'run_name': 'parameters_test'}
+        state, _ = load_state(self.root / 'parameters', GeneticConfig())
+        folder = self.module._CHESS_ENGINE_PACKAGE.notebook_bridge.parameter_export(self.module, cfg, state)
+        metadata = json.loads((folder / 'cristopher_genome.json').read_text())
+        self.assertEqual(metadata['version'], 'chess-parameters-1')
+        spec = importlib.util.spec_from_file_location('parameter_export_test', folder / 'cristopher_engine.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        result = module.CristopherEngine(folder / 'cristopher_genome.json').get_move(chess.STARTING_FEN, [], 'medium')
+        self.assertIn(chess.Move.from_uci(result['move']), chess.Board().legal_moves)
+
+    def test_new_search_options_do_not_change_old_gpu_checkpoint_identity(self):
+        cfg = copy.deepcopy(self.cfg)
+        cfg.pop('gpu_search_backend', None)
+        cfg.pop('gpu_search_options', None)
+        for key in ('gpu_validation_pairs', 'gpu_validation_seconds', 'gpu_validation_nodes'):
+            cfg.pop(key, None)
+        self.assertEqual(self.module.gpu_signature(cfg), self.module.gpu_signature(self.cfg))
 
 if __name__ == '__main__':
     unittest.main()

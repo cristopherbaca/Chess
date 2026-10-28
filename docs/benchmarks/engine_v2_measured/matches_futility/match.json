@@ -1,0 +1,19 @@
+{
+  "signature": "f174acd125741026bb3baf2bcc8a7bfb6be97ce535e02c26bcfc77b2e2092ec6",
+  "candidate": "6cb42ac699649c969695770844fa98b4fdae66de53352bf6001c4f17569f72b2futility",
+  "incumbent": "6cb42ac699649c969695770844fa98b4fdae66de53352bf6001c4f17569f72b2pvs",
+  "config": {
+    "pairs": 1,
+    "seed": 8021,
+    "move_seconds": 0.005,
+    "nodes": 32,
+    "depth": 64,
+    "base_seconds": 30,
+    "increment": 0.1,
+    "max_plies": 100,
+    "opening_plies": 6
+  },
+  "implementation_sha256": "abfac623e965f6e78cda70e4ba676d5843357e5630c9a251cd1cb3e4c455a8be",
+  "min_pairs": 32,
+  "attempt": 1
+}

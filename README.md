@@ -2,6 +2,58 @@
 
 A responsive chess frontend in plain HTML, CSS, and vanilla JavaScript ES modules. No framework, package installation, or build step. Offline mode chooses random legal moves after a 400–800 ms delay. `vendor/train.ipynb` trains and saves the champion; `vendor/deploy.ipynb` serves it through FastAPI and a public tunnel. Each notebook supports **Run all** independently.
 
+## AI and deployment documentation
+
+Read the **[technical document in Spanish (PDF)](docs/IA_Y_DEPLOYMENT.pdf)** for the model architecture, evolution algorithm, CPU/GPU execution, checkpoint recovery, deployment pipeline and HTTP contract. It covers the AI and deployment only, with diagrams and operating instructions. The [editable HTML](docs/IA_Y_DEPLOYMENT.html) is included.
+
+The current default neural evaluator has **14,828,801 parameters**, approximately **4×** the previous 3.7-million-parameter network:
+
+| Setting | Current default |
+| --- | --- |
+| Architecture | 784 → 4608 → 2432 → 1; two ReLU hidden layers |
+| Learning | Mirrored evolution strategies from played-game rewards |
+| Population | 64 perturbed candidates, plus center and reference opponents |
+| Training | CUDA, configurable session (currently 2.5 hours); run `gpu_es_15m_v1` |
+| Single-network weights | 59.3 MB FP32 / 29.7 MB FP16; excludes population, state and activations |
+| Recovery | Checkpoints about every 60 seconds after the current batch; last three retained |
+| Deployment | Saved champion → FastAPI → tested public HTTPS URL; CPU or CUDA inference |
+
+The neural output is a bounded correction to a fixed material/piece-square evaluation. The existing dense ES trainer retains its batched one-ply fitness games; deployment now uses the shared alpha-beta engine for medium/hard. Independent search-based matches gate champion promotion. Stockfish is optional for benchmarking; the separate sparse-network pipeline can also use UCI-generated labels. The selected champion is published during training and can remain the initial baseline until a challenger passes the promotion gate.
+
+The current 14.8-million-parameter architecture has passed a CPU export/load and legal-move smoke check at all three difficulties using freshly initialized test weights. Full CUDA training and the user's trained champion have not been benchmarked locally. These checks do not establish playing strength.
+
+To regenerate the PDF after editing its HTML, use an installed Chrome/Chromium:
+
+```sh
+python3 docs/build_pdf.py
+# For a browser in another location:
+python3 docs/build_pdf.py --browser /path/to/chromium
+```
+
+The PDF describes the implementation as of October 26, 2026. The current development requirements are in [PHASES.md](PHASES.md); the [architecture assessment](docs/ARCHITECTURE_ASSESSMENT.md) and [first milestone report](docs/MILESTONE_01.md) document subsequent findings and changes.
+
+### Modular engine implementation
+
+The [engine guide and implementation status](docs/ENGINE_GUIDE.md) maps every phase in [PHASES.md](PHASES.md) to code, tests and remaining experimental work. The implementation includes a shared alpha-beta/PVS search, quiescence, bounded transposition tables, tapered classical evaluation, evolutionary parameter training, optional incremental sparse neural evaluation, UCI, resumable paired matches, promotion gates and profiling tools.
+
+**67 automated tests pass**, including sequential training cells, checkpoint recovery, standalone exports, API requests, UCI and deployment rerun/shutdown. See the [implementation and validation report](docs/MILESTONE_02.md).
+
+Your **14,828,801-parameter dense network and checkpoint identity are preserved**. Medium/hard deployment now uses `shared-alpha-beta-v2`. Easy retains its existing sampled play. Null-move pruning, LMR, futility and check extensions are implemented as independent options and remain **off by default** pending convincing match evidence. The sparse neural evaluator is a separate experiment; it does not replace or convert your dense champion.
+
+To use the updated search with your saved weights, run the updated **training notebook with the same run settings**, which republishes the incumbent with the new engine source, then rerun **deployment**. Old immutable exports keep their original code. No restart from generation zero is required. Earlier champions remain incumbents, marked unverified under the new independent promotion protocol until they earn new evidence.
+
+For the new classical genetic trainer, select `TRAINING_MODE = 'parameter_evolution'` in the same training notebook. Its default run is `parameters_v1`. Deployment supports dense, evolved classical and explicitly exported sparse/hybrid bundles. The deployment loader reports the search version and verification status.
+
+```sh
+python -m pip install numpy python-chess torch nbformat fastapi uvicorn nest_asyncio httpx requests tqdm
+python -m unittest discover -s tests -p 'test_*.py' -v
+python tools/sync_engine.py --check
+python -m chess_ai  # UCI engine; does not start the HTTP API
+python tools/benchmark_engine.py --output /tmp/chess-benchmark/profile.json --ablations
+```
+
+The [latest raw profiles](docs/benchmarks/engine_v2_measured/profile.json) and [full-size CPU smoke check](docs/benchmarks/engine_v2_final/dense_cpu_smoke.json) record actual results. All ten search configurations solved 12 of 13 scored targets at the measured budget; the pawn breakthrough remains a failure. Short diagnostic matches and legal-move checks do **not** establish an Elo gain. The [initial audit](docs/ARCHITECTURE_ASSESSMENT.md) and [first milestone](docs/MILESTONE_01.md) remain historical snapshots.
+
 ## Run
 
 From this directory:
@@ -60,28 +112,46 @@ Chess/
   vendor/LICENSE-chess.md
   vendor/train.ipynb    Training, automatic champion saving, resume
   vendor/deploy.ipynb   Deployment only; Run all returns the public URL
+  docs/IA_Y_DEPLOYMENT.pdf   Technical document in Spanish: AI and deployment
+  docs/IA_Y_DEPLOYMENT.html  Editable document source
+  docs/build_pdf.py         Regenerate PDF using Chrome/Chromium
   tests/index.html      Browser regression runner
   tests/tests.js
   tests/test_api.py     API regression checks
   tests/test_notebooks.py  Persistence and recovery checks
   tests/test_deployment_flow.py  Local deployment Run-all integration
-  PHASE2_README.md      AI training documentation
+  tests/test_engine.py  Perft, state/hash restoration and tactical search regressions
+  tests/engine_positions.json  Referenced rule counts and search fixtures
+  chess_ai/                  Modular rules adapter, search, evaluation, training, UCI
+  tools/run_match.py         Controlled resumable matches and promotion evidence
+  tools/train_nnue.py        Optional sparse-network training from labeled positions
+  tools/export_model.py      Publish validated modular models for deployment
+  tools/sync_engine.py       Bundle canonical Python modules into train.ipynb
+  docs/ENGINE_GUIDE.md       Current implementation, commands and limitations
+  tools/notebook_engine.py    Load engine definitions without running notebooks
+  tools/benchmark_search.py   Reproducible search comparison
+  docs/ARCHITECTURE_ASSESSMENT.md  Initial audit
+  docs/MILESTONE_01.md         First change, evidence and remaining work
+  docs/benchmarks/             Raw before/after reports
+  PHASES.md            Engine development requirements
   LICENSES.md           Asset sources and licenses
   README.md
 ```
 
-## Connect to Cristopher
+## Train and deploy the AI
 
-1. **Train:** open [vendor/train.ipynb](vendor/train.ipynb) in Colab (or VS Code with a Colab kernel), select a GPU runtime, and choose **Run all**. Allow Drive access. The default budget is three hours; the same run name resumes saved progress.
+1. **Train:** open [vendor/train.ipynb](vendor/train.ipynb) in Colab (or VS Code with a Colab kernel), select a GPU runtime, and choose **Run all**. Allow Drive access. The default is a **14,828,801-parameter** network (784 → 4608 → 2432 → 1) with the configured `TRAINING_HOURS` budget (currently 2.5 hours). The new run name `gpu_es_15m_v1` keeps the previous smaller model’s checkpoints separate; subsequent runs resume this larger model.
 2. **Deploy:** open [vendor/deploy.ipynb](vendor/deploy.ipynb) in another Colab runtime and choose **Run all**. It loads the saved champion, starts FastAPI, opens a tunnel, tests both endpoints, and finishes by printing the verified **HTTPS URL**. It does not train or run an infinite heartbeat, and it leaves the API running. CPU inference is supported.
 3. Paste that URL into **Settings → Connect to Cristopher → Server URL**, enable **Use AI server**, and press **Test connection**. Select AI, choose a difficulty, and press Play.
 4. Keep the deployment runtime connected. To stop it, disconnect the runtime or call `shutdown_api()` in a new notebook cell. Cloudflare is the default; the deployment form also supports ngrok using the `NGROK_TOKEN` Colab secret or a hidden prompt.
+
+The deployment loads a snapshot once. To serve a newly published champion, rerun the deployment notebook; it closes its previous server/tunnel and loads the latest bundle. This temporary API has no authentication or rate limiting, and `/stats` exposes recent move-request records to anyone with its URL.
 
 ### Automatic champion saving
 
 GPU training writes resumable checkpoints about every **60 seconds**, after the current batch, at generation boundaries, and on recoverable exit. It retains the last three checkpoints, including the current population and in-progress games. Each new selected champion is exported during training, not just at the end; the initial baseline is also exported before training starts. Generation `-1` means no challenger has passed the existing promotion gate yet.
 
-Snapshots are complete, immutable folders under `MyDrive/cristopher_evo/models/deployments/`. Only after all files are written does an atomic `models/latest_champion.json` pointer select the new bundle. Deployment checks its file hashes before loading it. An interrupted write leaves the previous published champion usable. Older bundles remain available; unchanged champions do not produce duplicate exports. Legacy flat exports are still accepted when no pointer exists. Classic mode retains its existing generation-winner selection and saves it after each completed generation.
+Snapshots are complete, immutable folders under `MyDrive/cristopher_evo/models/deployments/`. Only after all files are written does an atomic `models/latest_champion.json` pointer select the new bundle. Deployment checks its file hashes before loading it. An interrupted write leaves the previous published champion usable. Older bundles remain available; unchanged champions do not produce duplicate exports. Legacy flat exports are still accepted when no pointer exists. Both classic and dense training now require independent color-paired validation before replacing their incumbent. The new parameter trainer uses the same evidence framework. Higher training fitness alone is insufficient.
 
 A killed runtime cannot execute a final save: the last completed Drive save survives, while unsaved work since then may be lost. Run all in the training notebook again to recover, with the same Drive account, run name and experiment settings. Keep one training runtime per run name. Drive must remain mounted and writable.
 
@@ -120,7 +190,7 @@ Client timeouts are configurable in `js/config.js`: `REQUEST_TIMEOUT_MS=15000`, 
 {
   "status": "ok",
   "engine": "cristopher",
-  "version": "cristopher-evo-1",
+  "version": "cristopher-gpu-es-1",
   "uptime_s": 42
 }
 ```
@@ -202,7 +272,7 @@ Additional local integration checks passed:
 - GPU export loading and all three difficulties on CPU, including neural depth-1 fallback, using an existing small local test model. This does not establish GPU runtime performance or champion strength.
 - The mobile Settings panel fits at 390px without horizontal overflow. Browser tests also verify the 20-second polling interval and hidden-tab cancellation with simulated visibility events.
 
-**Not verified here:** Colab Drive mounting, live Cloudflare/ngrok tunnel creation and public URL tests, the user's actual exported champion, or long-term Colab connectivity. The tunnel cell includes public health and legal-move tests with retries to run in the connected Colab runtime. The existing evolution and promotion rules and vendored chess.js are preserved; checkpoint publication and notebook execution are updated for separate Run-all workflows.
+**Not verified here:** Colab Drive mounting, live Cloudflare/ngrok tunnel creation and public URL tests, the user's actual exported champion, or long-term Colab connectivity. The tunnel cell includes public health and legal-move tests with retries to run in the connected Colab runtime. The existing dense evolution algorithm and vendored chess.js are preserved; promotion now requires independent evidence. Colab installation, Drive synchronization and the public tunnel still require verification in the actual runtime.
 
 ## Third-party credits
 

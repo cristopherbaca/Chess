@@ -1,0 +1,45 @@
+{
+  "perft_reference": "https://github.com/jwiegley/emacs-chess/blob/master/chess-perft.el",
+  "perft": [
+    {
+      "name": "initial",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "counts": [20, 400, 8902, 197281]
+    },
+    {
+      "name": "kiwipete",
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "counts": [48, 2039, 97862]
+    }
+  ],
+  "search": [
+    {
+      "name": "smothered_mate_reply",
+      "fen": "5r1k/6pp/7N/8/8/8/8/KQ6 b - - 0 1",
+      "branch": "f8g8",
+      "mate_reply": "h6f7",
+      "depth": 2,
+      "beam": 4
+    },
+    {
+      "name": "quiet_queen_mate_reply",
+      "fen": "7k/R7/3Bq3/1pb5/8/b7/8/5Q1K b - - 0 1",
+      "branch": "h8g8",
+      "mate_reply": "f1f8",
+      "depth": 2,
+      "beam": 8
+    },
+    {
+      "name": "initial_medium",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "depth": 2,
+      "beam": 4
+    },
+    {
+      "name": "kiwipete_hard",
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "depth": 3,
+      "beam": 8
+    }
+  ]
+}

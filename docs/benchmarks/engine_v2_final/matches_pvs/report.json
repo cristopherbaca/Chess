@@ -1,0 +1,23 @@
+{
+  "accepted": false,
+  "complete": true,
+  "pairs": 1,
+  "mean_score": 0.5,
+  "score_lower_bound": 0.0,
+  "test_alpha": 0.025,
+  "attempt": 1,
+  "method": "one-sided Hoeffding bound on independent opening-pair scores; alpha spending",
+  "wins": 0,
+  "draws": 2,
+  "losses": 0,
+  "unfinished": 0,
+  "errors": 0,
+  "score_interval_95": null,
+  "elo_difference": null,
+  "elo_interval_95": null,
+  "elo_note": "Relative to this opponent/control only; null endpoints are unbounded. Not an absolute rating.",
+  "finished_games": 2,
+  "signature": "3e3be4ff3a09212d8dbbcacf130590119908bd5f7a27be0d9fd66662f4d25762",
+  "candidate": "6cb42ac699649c969695770844fa98b4fdae66de53352bf6001c4f17569f72b2pvs",
+  "incumbent": "6cb42ac699649c969695770844fa98b4fdae66de53352bf6001c4f17569f72b2baseline"
+}
