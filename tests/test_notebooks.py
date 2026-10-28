@@ -224,5 +224,13 @@ class NotebookTests(unittest.TestCase):
             cfg.pop(key, None)
         self.assertEqual(self.module.gpu_signature(cfg), self.module.gpu_signature(self.cfg))
 
+    def test_saved_champion_comparison_checkpoints_without_publication(self):
+        pointer = self.pointer().read_bytes()
+        bridge = self.module._CHESS_ENGINE_PACKAGE.notebook_bridge
+        report = bridge.validate_saved_dense_search(self.module, self.cfg, self.bundle(), pairs=1, seconds=.001, hours=.000001)
+        self.assertFalse(report['accepted'])
+        self.assertEqual(self.pointer().read_bytes(), pointer)
+        self.assertTrue(list((self.root / 'logs').rglob('runtime.json')))
+
 if __name__ == '__main__':
     unittest.main()

@@ -95,6 +95,29 @@ class SparseNetworkTests(unittest.TestCase):
             self.assertTrue((root / 'model/best_validation.npz').exists())
             self.assertTrue(np.isfinite(SparseEvaluator.load(root / 'model/best_validation.npz')(chess.Board())))
 
+    def test_explicit_test_labels_never_affect_training(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            boards = [chess.Board() for _ in range(3)]
+            boards[1].push_uci('e2e4'); boards[2].push_uci('d2d4')
+            rows = [{'fen': b.fen(), 'game_id': str(i), 'cp_white': 20, 'split': split}
+                    for i, (b, split) in enumerate(zip(boards, ['train', 'validation', 'test']))]
+            data = root / 'data.jsonl'
+            data.write_text('\n'.join(json.dumps(r) for r in rows))
+            result = train_labels(data, root / 'first', epochs=2, hidden=8)
+            self.assertEqual(result['test_positions_excluded'], 1)
+            rows[-1]['cp_white'] = -10000
+            data.write_text('\n'.join(json.dumps(r) for r in rows))
+            train_labels(data, root / 'second', epochs=2, hidden=8)
+            a = SparseEvaluator.load(root / 'first/best_validation.npz')
+            b = SparseEvaluator.load(root / 'second/best_validation.npz')
+            np.testing.assert_array_equal(a.w1, b.w1)
+            np.testing.assert_array_equal(a.output, b.output)
+            rows[-1]['fen'] = boards[0].mirror().fen()
+            data.write_text('\n'.join(json.dumps(r) for r in rows))
+            with self.assertRaisesRegex(ValueError, 'crosses dataset splits'):
+                train_labels(data, root / 'third', hidden=8)
+
 
 if __name__ == '__main__':
     unittest.main()

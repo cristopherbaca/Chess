@@ -69,9 +69,24 @@ class MatchConfig:
     increment: float = .1
     max_plies: int = 256
     opening_plies: int = 6
+    opening_file: str = ''
 
 
 def openings(config):
+    if config.opening_file:
+        book = json.loads(Path(config.opening_file).read_text())['openings']
+        if config.pairs > len(book):
+            raise ValueError('Not enough distinct opening pairs in the supplied book')
+        selected = random.Random(config.seed).sample(book, config.pairs)
+        result = []
+        for item in selected:
+            board = chess.Board()
+            for move in item['moves']:
+                board.push_uci(move)
+            if board.is_game_over(claim_draw=True):
+                raise ValueError('Terminal opening in match book')
+            result.append(list(item['moves']))
+        return result
     result = []
     for pair in range(config.pairs):
         rng = random.Random(config.seed + pair * 1009)
@@ -168,7 +183,8 @@ def play_game(players, opening, config, path, pair, candidate_white, deadline=fl
             row['remaining'][side] += config.increment
             row['evaluations'].append({'fen': board.fen(), 'move': answer.move.uci(),
                                       'score_stm': answer.score, 'depth': answer.depth, 'seconds': elapsed,
-                                      'nodes': answer.stats.get('nodes', 0)})
+                                      'nodes': answer.stats.get('nodes', 0),
+                                      'search_stats': answer.stats})
             board.push(answer.move)
             row['moves'].append(answer.move.uci())
             atomic_json(path, row)
@@ -189,12 +205,14 @@ def play_game(players, opening, config, path, pair, candidate_white, deadline=fl
 
 
 def run_match(candidate_factory, incumbent_factory, config, directory, candidate_id, incumbent_id,
-              deadline=float('inf'), min_pairs=32, attempt=1):
+              deadline=float('inf'), min_pairs=32, attempt=1, progress=None):
     if config.pairs < 1 or config.nodes < 1 or config.move_seconds <= 0 or config.base_seconds <= 0:
         raise ValueError('Invalid match budget')
     directory = Path(directory)
     identity = {'candidate': candidate_id, 'incumbent': incumbent_id, 'config': asdict(config),
                 'implementation_sha256': implementation_id(), 'min_pairs': min_pairs, 'attempt': attempt}
+    if config.opening_file:
+        identity['opening_sha256'] = hashlib.sha256(Path(config.opening_file).read_bytes()).hexdigest()
     signature = fingerprint(identity)
     manifest = directory / 'match.json'
     if manifest.exists() and json.loads(manifest.read_text())['signature'] != signature:
@@ -221,6 +239,8 @@ def run_match(candidate_factory, incumbent_factory, config, directory, candidate
                 atomic_json(directory / 'report.json', report)
                 return report
             rows.append(row)
+            if progress:
+                progress(len(rows), 2 * config.pairs)
     report = evidence(rows, config.pairs, min_pairs, attempt=attempt)
     report['finished_games'] = len(rows)
     report.update(signature=signature, candidate=candidate_id, incumbent=incumbent_id)

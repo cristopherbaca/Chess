@@ -1,0 +1,17 @@
+{
+  "test_positions": 3004,
+  "dataset_sha256": "742bc49f3b6be4213a9736ae47a47da5341bc4d5a8dac78bfd626be597c9d740",
+  "model_sha256": "43452faaf101f164f59cea95cc2226d9227ec10bdae89a7eb59385e557cfe35a",
+  "mse_tanh_cp400": {
+    "zero": 0.14954618830207797,
+    "classical": 0.1682426153338726,
+    "neural": 0.06860857145942903,
+    "quantized": 0.06860849095180538
+  },
+  "neural_minus_classical_mse_bootstrap95": [
+    -0.11326864489162639,
+    -0.08641400814883647
+  ],
+  "quantization_max_abs_cp": 0.01202392578125,
+  "note": "Untouched test split used once after model selection. Bootstrap assumes independent sampled positions; source prefix and related-position bias remain. Prediction loss is not Elo."
+}

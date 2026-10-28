@@ -22,6 +22,17 @@ def rows(score, pairs=32):
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_opening_book_hash_prevents_stale_resume(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'openings.json'
+            path.write_text(json.dumps({'openings': [{'moves': ['e2e4', 'e7e5']}, {'moves': ['d2d4', 'd7d5']}]}))
+            cfg = MatchConfig(pairs=2, opening_file=str(path), nodes=1, max_plies=3)
+            self.assertEqual(openings(cfg), openings(cfg))
+            run_match(Engine, Engine, cfg, Path(folder) / 'match', 'a', 'b')
+            path.write_text(json.dumps({'openings': [{'moves': ['e2e4', 'c7c5']}, {'moves': ['d2d4', 'd7d5']}]}))
+            with self.assertRaisesRegex(ValueError, 'configuration changed'):
+                run_match(Engine, Engine, cfg, Path(folder) / 'match', 'a', 'b')
+
     def test_draws_small_samples_and_missing_pairs_never_promote(self):
         self.assertFalse(evidence(rows(.5), 32)['accepted'])
         self.assertFalse(evidence(rows(1, 2), 2)['accepted'])

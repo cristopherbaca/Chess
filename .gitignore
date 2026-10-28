@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+# Downloaded datasets, resumable research games and experimental weights.
+# Curated fixtures and concise evidence reports are kept under tests/ and docs/.
+research_runs/

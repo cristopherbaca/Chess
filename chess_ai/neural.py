@@ -124,7 +124,7 @@ class SparseEvaluator:
             return cls(data['w1'], data['b1'], data['output'], float(data['bias']), float(data['scale']), metadata)
 
 
-def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, seed=42, resume=True):
+def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, seed=42, resume=True, progress=None):
     """Train from JSONL {fen, game_id, cp_white?, result_white?}; split by game.
 
     Saves resumable optimizer/RNG state and best held-out-loss network each epoch.
@@ -140,11 +140,25 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
     rng = np.random.default_rng(seed)
     rng.shuffle(games)
     heldout = set(games[:max(1, len(games) // 5)])
+    explicit = any('split' in row for row in rows)
+    if explicit and any(row.get('split') not in ('train', 'validation', 'test') for row in rows):
+        raise ValueError('Every row needs an explicit train/validation/test split')
+    groups, positions = {}, {}
     encoded = []
     for row in rows:
         board = chess.Board(row['fen'])
         if not board.is_valid():
             raise ValueError('Invalid training FEN')
+        split = row['split'] if explicit else ('validation' if str(row['game_id']) in heldout else 'train')
+        group = str(row['game_id'])
+        if group in groups and groups[group] != split:
+            raise ValueError('A game_id cannot cross dataset splits')
+        groups[group] = split
+        if explicit:
+            key = min(' '.join(board.fen().split()[:4]), ' '.join(board.mirror().fen().split()[:4]))
+            if key in positions and positions[key] != split:
+                raise ValueError('An identical or mirrored position crosses dataset splits')
+            positions[key] = split
         targets = []
         if 'cp_white' in row:
             targets.append(float(np.tanh(float(row['cp_white']) / 400)))
@@ -155,9 +169,12 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
         if not targets or not np.isfinite(targets).all():
             raise ValueError('Each row needs a finite label')
         target = sum(targets) / len(targets) * (1 if board.turn else -1)
-        encoded.append((active_features(board, board.turn), active_features(board, not board.turn), target, str(row['game_id']) in heldout))
-    training = [r for r in encoded if not r[3]]
-    validation = [r for r in encoded if r[3]]
+        encoded.append((active_features(board, board.turn), active_features(board, not board.turn), target, split))
+    training = [r for r in encoded if r[3] == 'train']
+    validation = [r for r in encoded if r[3] == 'validation']
+    if not training or not validation:
+        raise ValueError('Nonempty training and validation splits are required')
+    heldout = {g for g, split in groups.items() if split == 'validation'}
     torch.manual_seed(seed)
     initial = SparseEvaluator.initial(hidden, seed)
     w1 = torch.nn.Parameter(torch.from_numpy(initial.w1.copy()))
@@ -169,7 +186,7 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
     checkpoint = directory / 'training.pt'
-    signature = hashlib.sha256(Path(data_path).read_bytes() + f'{SCHEMA}:{hidden}:{seed}:{batch_size}'.encode()).hexdigest()
+    signature = hashlib.sha256(Path(data_path).read_bytes() + f'{SCHEMA}:batched-v2:{hidden}:{seed}:{batch_size}'.encode()).hexdigest()
     start, best, history = 0, float('inf'), []
     if resume and checkpoint.exists():
         pack = torch.load(checkpoint, map_location='cpu', weights_only=True)
@@ -183,12 +200,16 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
         start, best, history = pack['epoch'], pack['best'], pack['history']
 
     def loss(batch):
-        predictions = []
+        indices, offsets = [], []
         for own, opponent, _, _ in batch:
-            accum = torch.cat((b1 + w1[own].sum(0), b1 + w1[opponent].sum(0)))
-            predictions.append(torch.clamp(accum, 0, 1) @ output + bias)
+            for features in (own, opponent):
+                offsets.append(len(indices))
+                indices.extend(features)
+        accum = torch.nn.functional.embedding_bag(torch.tensor(indices, dtype=torch.long), w1,
+                    torch.tensor(offsets, dtype=torch.long), mode='sum') + b1
+        predictions = torch.clamp(accum, 0, 1).reshape(len(batch), 2 * hidden) @ output + bias
         target = torch.tensor([r[2] for r in batch], dtype=torch.float32)
-        return torch.mean((torch.tanh(torch.stack(predictions) / 400) - target) ** 2)
+        return torch.mean((torch.tanh(predictions / 400) - target) ** 2)
 
     for epoch in range(start, epochs):
         order = rng.permutation(len(training))
@@ -202,6 +223,8 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
             valid_loss = sum(float(loss(validation[i:i + batch_size])) * len(validation[i:i + batch_size])
                              for i in range(0, len(validation), batch_size)) / len(validation)
         history.append({'epoch': epoch + 1, 'validation_loss': valid_loss})
+        if progress:
+            progress(dict(history[-1]))
         if valid_loss < best:
             best = valid_loss
             SparseEvaluator(w1.detach().numpy().copy(), b1.detach().numpy().copy(), output.detach().numpy().copy(),
@@ -217,4 +240,5 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
         os.replace(temporary, checkpoint)
         (directory / 'history.json').write_text(json.dumps(history, indent=2) + '\n')
     return {'epochs': epochs, 'best_validation_loss': best, 'training_positions': len(training),
-            'validation_positions': len(validation), 'heldout_game_ids': sorted(heldout), 'history': history}
+            'validation_positions': len(validation), 'test_positions_excluded': sum(r[3] == 'test' for r in encoded),
+            'heldout_game_ids': sorted(heldout), 'history': history}
