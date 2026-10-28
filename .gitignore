@@ -3,3 +3,10 @@ __pycache__/
 # Downloaded datasets, resumable research games and experimental weights.
 # Curated fixtures and concise evidence reports are kept under tests/ and docs/.
 research_runs/
+
+.DS_Store
+_site/
+.env
+.env.*
+*.pem
+*.key

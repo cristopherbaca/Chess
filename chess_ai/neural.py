@@ -1,11 +1,14 @@
-"""Experimental king-bucket sparse evaluator with incremental CPU accumulators.
+"""
+Experimental king-bucket sparse evaluator with incremental CPU accumulators.
 
 This is an original small NNUE-style experiment, not a Stockfish network or a
 conversion of the existing 14.8M dense champion. Training requires labeled data.
 """
+
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 import chess
 import numpy as np
@@ -124,7 +127,7 @@ class SparseEvaluator:
             return cls(data['w1'], data['b1'], data['output'], float(data['bias']), float(data['scale']), metadata)
 
 
-def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, seed=42, resume=True, progress=None):
+def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, seed=42, resume=True, progress=None, deadline=float('inf')):
     """Train from JSONL {fen, game_id, cp_white?, result_white?}; split by game.
 
     Saves resumable optimizer/RNG state and best held-out-loss network each epoch.
@@ -212,6 +215,8 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
         return torch.mean((torch.tanh(predictions / 400) - target) ** 2)
 
     for epoch in range(start, epochs):
+        if time.monotonic() >= deadline:
+            break
         order = rng.permutation(len(training))
         for begin in range(0, len(order), batch_size):
             batch = [training[int(i)] for i in order[begin:begin + batch_size]]
@@ -239,6 +244,7 @@ def train_labels(data_path, output_dir, epochs=10, batch_size=64, hidden=64, see
             os.fsync(handle.fileno())
         os.replace(temporary, checkpoint)
         (directory / 'history.json').write_text(json.dumps(history, indent=2) + '\n')
-    return {'epochs': epochs, 'best_validation_loss': best, 'training_positions': len(training),
+    return {'epochs': history[-1]['epoch'] if history else start, 'target_epochs': epochs,
+            'best_validation_loss': best, 'training_positions': len(training),
             'validation_positions': len(validation), 'test_positions_excluded': sum(r[3] == 'test' for r in encoded),
             'heldout_game_ids': sorted(heldout), 'history': history}

@@ -71,6 +71,10 @@ def load_engine(path=None, evaluator='classical', options=None):
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     saved = module.CristopherEngine(path)
+    if hasattr(saved, 'evaluator') and hasattr(saved, 'searcher'):
+        # Preserve accumulator hooks and the validated configuration of modular
+        # exports instead of reducing them to an opaque callable.
+        return Engine(saved.evaluator, options or saved.searcher.options, saved.settings)
     if hasattr(saved, 'values'):
         neural = CallableEvaluator(lambda board: saved.values([board])[0])
         value = HybridEvaluator(ClassicalEvaluator(), neural) if evaluator == 'hybrid' else neural

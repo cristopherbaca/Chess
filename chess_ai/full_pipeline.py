@@ -11,8 +11,10 @@ import os
 from pathlib import Path
 import shutil
 import time
+import tracemalloc
 import uuid
 import chess
+import numpy as np
 from .evaluation import ClassicalEvaluator, CallableEvaluator, HybridEvaluator
 from .neural import SparseEvaluator, train_labels
 from .runtime import Engine
@@ -59,6 +61,35 @@ def dense_snapshot(cfg):
     return root / pointer['folder'] / 'cristopher_genome.json'
 
 
+def widen_dense_vector(host, vector, source_cfg, target_cfg):
+    """Duplicate ReLU units and divide outgoing weights to preserve predictions.
+
+    Evolution independently perturbs the new units after import. This only
+    supports widening existing hidden layers, never shrinking or adding layers.
+    """
+    import torch
+    old_hidden, new_hidden = source_cfg['gpu_hidden'], target_cfg['gpu_hidden']
+    if len(old_hidden) != len(new_hidden) or any(b < a for a, b in zip(old_hidden, new_hidden)):
+        raise ValueError('Source architecture can only be widened; choose matching or larger gpu_hidden widths')
+    old_layout, old_count = host.gpu_layout(source_cfg)
+    new_layout, new_count = host.gpu_layout(target_cfg)
+    if vector.ndim != 1 or vector.numel() != old_count:
+        raise ValueError('Dense checkpoint tensor does not match its source architecture')
+    result = vector.new_empty(new_count)
+    previous = torch.arange(old_layout[0][1], device=vector.device)
+    for (offset, a, b), (new_offset, new_a, new_b) in zip(old_layout, new_layout):
+        mapping = torch.arange(new_b, device=vector.device) % b
+        counts = torch.bincount(previous, minlength=a).to(vector.dtype)
+        weights = vector[offset:offset + a*b].reshape(a, b)
+        widened = weights.index_select(0, previous).index_select(1, mapping)
+        widened /= counts.index_select(0, previous).unsqueeze(1)
+        result[new_offset:new_offset + new_a*new_b] = widened.reshape(-1)
+        bias = vector[offset + a*b:offset + a*b + b]
+        result[new_offset + new_a*new_b:new_offset + new_a*new_b + new_b] = bias[mapping]
+        previous = mapping
+    return result
+
+
 def load(host, cfg, create=False):
     folder = workspace(cfg)
     checkpoints = sorted((folder / 'state').glob('checkpoint_*.json'), reverse=True)
@@ -84,16 +115,31 @@ def load(host, cfg, create=False):
         seed = None
         for path in paths:
             try:
-                seed = torch.load(path, map_location='cpu', weights_only=True)
+                candidate = torch.load(path, map_location='cpu', weights_only=True)
+                if candidate['signature'] != host.gpu_signature(candidate['CFG']):
+                    continue
+                if not {'champion', 'mean', 'generation', 'rng'} <= set(candidate['state']):
+                    continue
+                seed = candidate
                 break
-            except (OSError, ValueError, RuntimeError, EOFError):
+            except Exception:
                 continue
         if seed is None:
             raise FileNotFoundError(f'No readable dense checkpoint in {source}. Set SOURCE_RUN to your saved run; leave it blank only for a new network.')
-        if seed['CFG']['gpu_hidden'] != cfg['gpu_hidden']:
-            raise ValueError('The source model architecture differs; restore its gpu_hidden settings')
         dense_state = seed['state']
         origin = {'run': source_run, 'generation': dense_state['generation'], 'checkpoint': str(path)}
+        if seed['CFG']['gpu_hidden'] != cfg['gpu_hidden']:
+            for key in ('mean', 'champion', 'initial'):
+                dense_state[key] = widen_dense_vector(host, dense_state[key], seed['CFG'], dcfg)
+            dense_state['hall'] = [widen_dense_vector(host, weights, seed['CFG'], dcfg)
+                                   for weights in dense_state['hall']]
+            origin['widened_from'] = seed['CFG']['gpu_hidden']
+            origin['widened_to'] = cfg['gpu_hidden']
+            # Old strength evidence belongs to the old numerical implementation.
+            dense_state['champion_verified'] = False
+            dense_state['champion_validation'] = None
+            dense_state['promotion_protocol'] = 'widened-incumbent-unverified'
+            print(f"Widened dense model: {origin['widened_from']} → {origin['widened_to']}; original checkpoints preserved", flush=True)
         # Keep learned tensors, incumbent, RNG and generation, but restart partial
         # fitness games because the new branch uses a different move selector.
         dense_state['jobs'] = []
@@ -123,7 +169,10 @@ def make_engine(host, spec):
             evaluator = HybridEvaluator(ClassicalEvaluator(spec['classical']), evaluator)
     else:
         raise ValueError('Unknown pipeline evaluator')
-    return Engine(evaluator, SearchOptions(**spec['options']))
+    engine = Engine(evaluator, SearchOptions(**spec['options']))
+    if kind in ('dense', 'hybrid'):
+        engine.dense_model = dense
+    return engine
 
 
 def model_identity(spec):
@@ -200,6 +249,12 @@ class CristopherEngine(_CHESS_ENGINE_PACKAGE.full_pipeline.DeployedEngine):
 def challenge(host, cfg, state, candidate, label, deadline):
     identity = {'candidate': model_identity(candidate), 'incumbent': model_identity(state['champion']),
                 'source': implementation_id(), 'cycle': state['cycle'], 'attempt': state['attempts'] + 1}
+    for record in state['history']:
+        report = record.get('report', {})
+        if (record.get('source') == implementation_id() and report.get('complete')
+                and fingerprint(report.get('candidate')) == fingerprint(identity['candidate'])
+                and fingerprint(report.get('incumbent')) == fingerprint(identity['incumbent'])):
+            return True  # Do not repeatedly test the same unchanged challenger.
     config = MatchConfig(pairs=cfg.get('pipeline_validation_pairs', 32),
                          seed=cfg['seed'] + 800000003 + 1009 * state['attempts'],
                          move_seconds=cfg.get('pipeline_move_seconds', .25), nodes=cfg.get('pipeline_nodes', 10000),
@@ -212,7 +267,7 @@ def challenge(host, cfg, state, candidate, label, deadline):
     if report['finished_games'] != 2 * config.pairs:
         return False
     state['attempts'] += 1
-    state['history'].append({'cycle': state['cycle'], 'stage': label, 'report': report})
+    state['history'].append({'cycle': state['cycle'], 'stage': label, 'source': implementation_id(), 'report': report})
     if report['accepted']:
         state['champion'] = copy.deepcopy(candidate)
         state['champion_validation'] = report
@@ -224,23 +279,56 @@ def challenge(host, cfg, state, candidate, label, deadline):
 
 def diagnostics(host, cfg, state, deadline):
     folder = workspace(cfg) / 'reports'
-    path = folder / f"cycle_{state['cycle']:04d}.json"
+    report_id = fingerprint({'source': implementation_id(), 'champion': model_identity(state['champion'])})[:16]
+    path = folder / f"cycle_{state['cycle']:04d}_{report_id}.json"
     rows = json.loads(path.read_text())['positions'] if path.exists() else []
     for case in CASES[len(rows):]:
         if time.monotonic() >= deadline:
             return False
         engine = make_engine(host, state['champion'])
         board = chess.Board(case['fen'])
-        result = engine.choose(board, seconds=min(.25, max(0, deadline-time.monotonic())), nodes=cfg.get('pipeline_nodes', 10000))
+        tracemalloc.start()
+        try:
+            result = engine.choose(board, seconds=min(.25, max(0, deadline-time.monotonic())), nodes=cfg.get('pipeline_nodes', 10000))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
         passed = None
         if case['goal'] == 'bestmove':
             passed = result.move.uci() in case['moves']
         elif case['goal'] == 'mate':
             board.push(result.move); passed = board.is_checkmate()
-        rows.append({'id': case['id'], 'move': result.move.uci(), 'passed': passed, 'depth': result.depth, 'stats': result.stats})
+        row = {'id': case['id'], 'move': result.move.uci(), 'passed': passed, 'depth': result.depth,
+               'stats': result.stats, 'python_peak_bytes': peak}
+        if hasattr(engine, 'dense_model'):
+            bank = engine.dense_model.bank
+            row['device'] = str(bank.device)
+            if bank.device.type == 'cuda':
+                row['cuda_allocated_bytes'] = bank.torch.cuda.memory_allocated(bank.device)
+        rows.append(row)
         atomic_json(path, {'source': implementation_id(), 'champion': model_identity(state['champion']), 'positions': rows,
                           'solved': sum(r['passed'] is True for r in rows), 'scored': sum(r['passed'] is not None for r in rows)})
     return True
+
+
+def sparse_test_report(labels, model, path):
+    identity = {'data': hashlib.sha256(Path(labels).read_bytes()).hexdigest(),
+                'model': hashlib.sha256(Path(model).read_bytes()).hexdigest()}
+    if path.exists() and json.loads(path.read_text()).get('identity') == identity:
+        return
+    neural, classical = SparseEvaluator.load(model), ClassicalEvaluator()
+    errors = {'neural': [], 'classical': []}
+    for line in Path(labels).read_text().splitlines():
+        row = json.loads(line)
+        if row.get('split') != 'test' or 'cp_white' not in row:
+            continue
+        board = chess.Board(row['fen'])
+        target = np.tanh(row['cp_white']/400) * (1 if board.turn else -1)
+        for name, evaluator in (('neural', neural), ('classical', classical)):
+            errors[name].append(float((np.tanh(evaluator(board)/400)-target)**2))
+    atomic_json(path, {'identity': identity, 'test_positions': len(errors['neural']),
+                'mse_tanh_cp400': {k: float(np.mean(v)) if v else None for k, v in errors.items()},
+                'note': 'Untouched test labels are reporting only, never a training or promotion criterion. Loss is not Elo.'})
 
 
 def run(host, cfg):
@@ -279,16 +367,17 @@ def run(host, cfg):
                     labels = prepare_labels(labels, cfg.get('pipeline_label_positions', 20000), time.monotonic()+remaining*.25, excluded)
                     if labels is None:
                         state['sparse_status'] = 'Label download checkpointed; resume this stage'; save(cfg, state); break
-                    # Train one epoch at a time so the session budget is checked
-                    # between durable checkpoints, not only after all epochs.
-                    for epoch in range(1, cfg.get('pipeline_sparse_epochs', 100)+1):
-                        if time.monotonic() >= deadline:
-                            save(cfg, state); return state
-                        train_labels(labels, root/'sparse', epochs=epoch, batch_size=256, hidden=64,
-                                     progress=lambda row: print('Sparse training:', row, flush=True))
+                    trained = train_labels(labels, root/'sparse', epochs=cfg.get('pipeline_sparse_epochs', 100),
+                                 batch_size=256, hidden=64, deadline=deadline,
+                                 progress=lambda row: print('Sparse training:', row, flush=True))
+                    if trained['epochs'] < trained['target_epochs']:
+                        save(cfg, state); return state
                     best = str(root/'sparse'/'best_validation.npz')
-                    frozen = root/'sparse'/f"candidate_cycle_{state['cycle']:04d}.npz"
-                    shutil.copyfile(best, frozen)
+                    digest = hashlib.sha256(Path(best).read_bytes()).hexdigest()
+                    frozen = root/'sparse'/f"candidate_{digest}.npz"
+                    if not frozen.exists():
+                        shutil.copyfile(best, frozen)
+                    sparse_test_report(labels, frozen, root/'sparse'/'test_report.json')
                     state['candidates'].extend([{'kind': 'sparse', 'sparse': str(frozen), 'options': state['champion']['options']},
                         {'kind': 'sparse_hybrid', 'sparse': str(frozen), 'classical': state['candidates'][1]['classical'],
                          'options': state['champion']['options']}])

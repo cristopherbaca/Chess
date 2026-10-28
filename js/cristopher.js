@@ -35,12 +35,21 @@ async function request(
           "ngrok-skip-browser-warning": "true",
         },
         signal: controller.signal,
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
       },
     );
     if (!response.ok)
       throw new CristopherError(
         "http",
-        `Cristopher's server returned HTTP ${response.status}. Please try again.`,
+        response.status === 429
+          ? `Too many requests. Please wait ${response.headers?.get?.("Retry-After") || "a few"} seconds before retrying.`
+          : response.status === 503
+            ? "The AI is busy. Please wait a moment and retry."
+            : response.status === 403
+              ? "This website is not allowed by the API. Check WEBSITE_ORIGINS in deployment."
+              : `The AI server returned HTTP ${response.status}. Please try again.`,
       );
     return await response.json();
   } catch (error) {

@@ -45,8 +45,11 @@ def environment():
         engine = engine_module.CristopherEngine(path)
     scope = {'API_ENGINE': engine, 'API_MODULE': engine_module, 'API_VERSION': 'phase3-test-default-weights',
              'API_ENGINE_LOCK': threading.Lock(), 'API_TIME_CAPS': {'easy': 3., 'medium': 10., 'hard': 25.},
-             'threading': threading, 'time': time}
+             'threading': threading, 'time': time, 'WEBSITE_ORIGINS': 'https://chess.example',
+             'TUNNEL': 'cloudflare', 'API_ADMIN_TOKEN': 'test-only-admin-token'}
     exec(compile(cell('app'), '<phase3-app>', 'exec'), scope)
+    # Core engine tests intentionally exceed public quotas; security has its own tests.
+    scope['API_POLICY'].rates = scope['API_POLICY'].global_rates = ((10000, 10000), (10000, 10000))
     return scope
 
 class ApiTests(unittest.TestCase):
@@ -54,6 +57,11 @@ class ApiTests(unittest.TestCase):
     def setUpClass(cls):
         cls.scope = environment()
         cls.client = TestClient(cls.scope['api'])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.close()
+        cls.scope['API_EXECUTOR'].shutdown(wait=True, cancel_futures=True)
 
     def post(self, **kwargs):
         return self.client.post('/move', json={'fen': chess.STARTING_FEN, 'difficulty': 'easy', **kwargs})
@@ -117,7 +125,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(reply.status_code, 200)
         self.assertIn('ngrok-skip-browser-warning', reply.headers['access-control-allow-headers'])
         reply = self.client.post('/move', json={'fen': 'bad'}, headers={'Origin': 'https://chess.example'})
-        self.assertEqual(reply.headers['access-control-allow-origin'], '*')
+        self.assertEqual(reply.headers['access-control-allow-origin'], 'https://chess.example')
 
     def test_deadline_releases_lock_and_preserves_budget(self):
         engine = self.scope['API_ENGINE']
@@ -165,12 +173,14 @@ class ApiTests(unittest.TestCase):
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 replies = list(pool.map(lambda _: self.post(), range(4)))
         self.assertEqual(peak, 1)
-        self.assertTrue(all(r.status_code == 200 for r in replies))
+        self.assertTrue(any(r.status_code == 200 for r in replies))
+        self.assertTrue(all(r.status_code in (200, 503) for r in replies))
+        self.assertTrue(any(r.status_code == 503 for r in replies))
 
     def test_ring_buffer_and_counters(self):
         for _ in range(51):
             self.post(fen='invalid')
-        stats = self.client.get('/stats').json()
+        stats = self.client.get('/stats', headers={'Authorization': 'Bearer test-only-admin-token'}).json()
         self.assertEqual(len(stats['last_requests']), 50)
         self.assertGreaterEqual(stats['counters']['errors'], 51)
         self.assertTrue({'fen', 'difficulty', 'move', 'time_ms', 'at', 'status'} <= stats['last_requests'][-1].keys())

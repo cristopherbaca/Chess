@@ -12,7 +12,8 @@ from pathlib import Path
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ('board', 'evaluation', 'search', 'neural', 'runtime', 'matches', 'training', 'notebook_bridge')
+MODULES = ('board', 'evaluation', 'search', 'neural', 'runtime', 'matches', 'training', 'notebook_bridge',
+           'datasets', 'validation_cases', 'full_pipeline')
 BEGIN = '# BEGIN GENERATED CHESS ENGINE BUNDLE\n'
 END = '# END GENERATED CHESS ENGINE BUNDLE\n'
 
@@ -61,14 +62,39 @@ def sync(check=False):
     if check:
         if source != updated:
             raise SystemExit('Stale notebook engine bundle. Run python tools/sync_engine.py')
-        print('Notebook engine bundle matches canonical modules.')
+        sync_security(check=True)
+        print('Notebook engine and API security bundles match canonical modules.')
         return
     literal = ast.get_source_segment(code, assignment.value)
     assert "'''" not in updated
     code = code.replace(literal, "r'''" + updated + "'''", 1)
     cell['source'] = code.splitlines(keepends=True)
     path.write_text(json.dumps(book, ensure_ascii=False, indent=1) + '\n')
+    sync_security()
     print('Updated standalone notebook bundle; preserved notebook outputs/settings.')
+
+
+def sync_security(check=False):
+    path = ROOT / 'vendor/deploy.ipynb'
+    book = json.loads(path.read_text())
+    cell = next(c for c in book['cells'] if c['id'] == 'phase3-app')
+    code = ''.join(cell['source'])
+    begin, end = '# BEGIN GENERATED API SECURITY\n', '# END GENERATED API SECURITY\n'
+    source = (ROOT / 'chess_ai/api_security.py').read_text()
+    assert "'''" not in source
+    generated = begin + "SECURITY_SOURCE = r'''" + source + "'''\n" + end
+    if begin in code:
+        start, stop = code.index(begin), code.index(end) + len(end)
+        updated = code[:start] + generated + code[stop:]
+    else:
+        title, rest = code.split('\n', 1)
+        updated = title + '\n' + generated + rest
+    if check:
+        if code != updated:
+            raise SystemExit('Stale API security bundle. Run python tools/sync_engine.py')
+    else:
+        cell['source'] = updated.splitlines(keepends=True)
+        path.write_text(json.dumps(book, ensure_ascii=False, indent=1) + '\n')
 
 
 if __name__ == '__main__':

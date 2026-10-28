@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https: http://localhost:8000 http://127.0.0.1:8000; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#312e2b" />
     <meta
@@ -589,10 +591,7 @@
     <noscript
       ><p class="startup-message">Enable JavaScript to play chess.</p></noscript
     >
-    <script>
-      if (location.protocol === "file:")
-        document.getElementById("startup-error").hidden = false;
-    </script>
+    <script src="js/startup.js" defer></script>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>

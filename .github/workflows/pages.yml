@@ -1,0 +1,41 @@
+name: Publish Chess website
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Verified HTTPS API URL from deploy.ipynb'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: chess-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build frontend only
+        env:
+          CHESS_PUBLIC_API_URL: ${{ inputs.api_url }}
+        run: python3 tools/build_site.py
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

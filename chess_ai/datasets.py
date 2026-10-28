@@ -16,7 +16,19 @@ def prepare_labels(path, count=20000, deadline=float('inf'), excluded=()):
     import zstandard
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_suffix('.partial.jsonl')
-    rows = [json.loads(line) for line in partial.read_text().splitlines() if line.strip()] if partial.exists() else []
+    rows = []
+    if partial.exists():
+        lines = partial.read_text().splitlines()
+        for index, line in enumerate(lines):
+            if not line.strip():
+                continue
+            try:
+                rows.append(json.loads(line))
+            except ValueError:
+                if index != len(lines)-1:
+                    raise ValueError('Corrupt label cache before its final line')
+        # Remove a potentially interrupted final record before appending.
+        partial.write_text(''.join(json.dumps(row)+'\n' for row in rows))
     def key(board):
         return min(' '.join(board.fen().split()[:4]), ' '.join(board.mirror().fen().split()[:4]))
     seen = {key(chess.Board(row['fen'])) for row in rows} | set(excluded)

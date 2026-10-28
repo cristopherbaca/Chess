@@ -2,6 +2,7 @@
 Run separately (binds localhost:8000): python tests/test_deployment_flow.py
 """
 import contextlib
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -17,10 +18,22 @@ from test_notebooks import DEPLOY, fixture, source
 
 class DeploymentRunAllTest(unittest.TestCase):
     def test_run_all_returns_url_keeps_server_alive_and_can_rerun(self):
+        self.run_flow()
+
+    def test_full_pipeline_run_all_loads_selected_engine_and_returns_url(self):
+        self.run_flow(full_pipeline=True)
+
+    def run_flow(self, full_pipeline=False):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             cfg, worker = fixture(root)
-            worker.gpu_load(cfg, create=True)  # A complete baseline snapshot without a training run.
+            if full_pipeline:
+                cfg.update(training_mode='full_pipeline', run_name='full_test', pipeline_source_run='')
+                pipeline = worker._CHESS_ENGINE_PACKAGE.full_pipeline
+                state = pipeline.load(worker, cfg, create=True)
+                pipeline.publish(worker, cfg, state)
+            else:
+                worker.gpu_load(cfg, create=True)  # A complete baseline snapshot without a training run.
             mounted = []
             google = types.ModuleType('google')
             colab = types.ModuleType('google.colab')
@@ -60,8 +73,13 @@ class DeploymentRunAllTest(unittest.TestCase):
                             if cell['cell_type'] != 'code':
                                 continue
                             code = ''.join(cell['source'])
-                            code = code.replace('/content/drive/MyDrive/cristopher_evo/models', str(root / 'models'))
+                            code = code.replace('/content/drive/MyDrive/chess_30m/models', str(root / 'models'))
                             code = code.replace("Path('/content/cloudflared')", f'Path({str(root / "cloudflared")!r})')
+                            # Pin the mocked binary's digest; production pin remains unchanged.
+                            if cell['id'] == 'phase3-tunnel':
+                                import re
+                                code = re.sub(r"CLOUDFLARED_SHA256 = '[0-9a-f]+'",
+                                    "CLOUDFLARED_SHA256 = '" + hashlib.sha256(b'local provider fixture').hexdigest() + "'", code)
                             exec(compile(code, cell['id'], 'exec'), scope)
                         self.assertEqual(scope['PUBLIC_URL'], fake_url)
                         self.assertTrue(scope['API_SERVER_THREAD'].is_alive())

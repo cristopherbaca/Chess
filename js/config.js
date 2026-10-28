@@ -1,3 +1,5 @@
+import { PUBLIC_API_URL } from "./public-config.js";
+
 const saved = (key, fallback) => {
   try {
     return localStorage.getItem(key) ?? fallback;
@@ -25,14 +27,14 @@ export function normalizeApiUrl(value) {
     );
   return url.href.replace(/\/+$/, "");
 }
-let apiUrl = "http://localhost:8000";
+let apiUrl = PUBLIC_API_URL || "http://localhost:8000";
 try {
   apiUrl = normalizeApiUrl(saved("chess.apiUrl", apiUrl));
 } catch {
   /* Ignore invalid saved URLs. */
 }
 export const CONFIG = {
-  USE_API: saved("chess.useApi", "false") === "true",
+  USE_API: saved("chess.useApi", PUBLIC_API_URL ? "true" : "false") === "true",
   API_URL: apiUrl,
   REQUEST_TIMEOUT_MS: 15000,
   HARD_REQUEST_TIMEOUT_MS: 30000,

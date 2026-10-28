@@ -38,10 +38,11 @@ class ArtifactTests(unittest.TestCase):
                 models = root / kind
                 publish_model(model, models, bundle_source(), initial=True)
                 scope = {}
-                code = source(DEPLOY, 'phase3-load').replace('/content/drive/MyDrive/cristopher_evo/models', str(models))
+                code = source(DEPLOY, 'phase3-load').replace('/content/drive/MyDrive/chess_30m/models', str(models))
                 with patch.dict(sys.modules, {'google': google, 'google.colab': colab}), patch('subprocess.check_call'):
                     exec(compile(code, 'phase3-load', 'exec'), scope)
                     exec(compile(source(DEPLOY, 'phase3-app'), 'phase3-app', 'exec'), scope)
+                    self.addCleanup(scope['API_EXECUTOR'].shutdown, wait=True, cancel_futures=True)
                 with TestClient(scope['api']) as client:
                     self.assertEqual(client.get('/health').status_code, 200)
                     response = client.post('/move', json={'fen': chess.STARTING_FEN, 'history': [], 'difficulty': 'easy'})

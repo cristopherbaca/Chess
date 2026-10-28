@@ -1,0 +1,133 @@
+{
+  "summary": "32/32 checks passed",
+  "checks": [
+    {
+      "passed": true,
+      "result": "PASS — Scholar’s mate and winner"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Both colors can castle on either side"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Castling through check is forbidden"
+    },
+    {
+      "passed": true,
+      "result": "PASS — En passant removes and counts the captured pawn"
+    },
+    {
+      "passed": true,
+      "result": "PASS — All four promotions and promotion UCI"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Stalemate, repetition, insufficient material, and 50-move draws"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Undo a completed AI round, an unanswered move, and a Black human round"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Placeholder returns a legal UCI move after its delay"
+    },
+    {
+      "passed": true,
+      "result": "PASS — API sends the contract and optional headers; health returns OK"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Illegal moves and omitted promotion letters are rejected"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Network, HTTP, malformed JSON, and timeout failures are friendly"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Hard has its own timeout, cancellation is typed, and fallback is opt-in"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Health identity, error results, URL normalization, and mixed content"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Public CSP blocks eval and inline scripts"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Before Play, the clock stays paused and the interface has one Settings button"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI click selection, legal dots, illegal destination, and last move"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI Scholar’s mate, capture rings, check king, SAN, and game lock"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI en passant and Undo restore captured pieces"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI castling moves the king and rook on both sides"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI promotion offers four choices; cancel preserves board; every choice works"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI keyboard navigation and flipped coordinates"
+    },
+    {
+      "passed": true,
+      "result": "PASS — AI input lock, completed-round Undo, and stale response after Undo"
+    },
+    {
+      "passed": true,
+      "result": "PASS — New Game invalidates an in-flight response; Black auto-flips and AI opens"
+    },
+    {
+      "passed": true,
+      "result": "PASS — UI API failure preserves board, Retry succeeds, resignation invalidates pending move"
+    },
+    {
+      "passed": true,
+      "result": "PASS — History review is read-only, preserves the live position, and returns to live"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Settings apply board themes and display preferences and persist them"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Clock deducts elapsed time, switches turns, restores undo, and flags only once"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Game result closes, rematches with the same settings, and local draw is agreed"
+    },
+    {
+      "passed": true,
+      "result": "PASS — No clock mode and actual clock displays track the moving side"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Connection Settings save URL, show identity and engine info, recover and stay offline"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Health polling uses 20 seconds and stops while the tab is hidden"
+    },
+    {
+      "passed": true,
+      "result": "PASS — Local games stop API checks; confirmed connection stays visible during refresh"
+    }
+  ]
+}

@@ -185,7 +185,9 @@ await test("Network, HTTP, malformed JSON, and timeout failures are friendly", a
   };
   await rejects(() => getCristopherMove(input), "couldn't reach");
   globalThis.fetch = async () => new Response("", { status: 503 });
-  await rejects(() => getCristopherMove(input), "HTTP 503");
+  await rejects(() => getCristopherMove(input), "AI is busy");
+  globalThis.fetch = async () => new Response("", { status: 429, headers: { "Retry-After": "12" } });
+  await rejects(() => getCristopherMove(input), "12 seconds");
   globalThis.fetch = async () => new Response("{");
   await rejects(() => getCristopherMove(input), "unreadable");
   CONFIG.REQUEST_TIMEOUT_MS = 20;
@@ -291,10 +293,28 @@ await until(
   "application to load",
 );
 const doc = frame.contentDocument;
-const frameConfigUrl = new URL("../js/config.js", import.meta.url).href;
-const frameConfig = (
-  await frame.contentWindow.eval(`import(${JSON.stringify(frameConfigUrl)})`)
-).CONFIG;
+// Load a same-origin external module into the frame without unsafe-eval.
+// This helper lives only in tests/ and is excluded from the Pages artifact.
+await new Promise((resolve, reject) => {
+  const bridge = doc.createElement("script");
+  bridge.type = "module";
+  bridge.src = new URL("./frame_bridge.js", import.meta.url).href;
+  bridge.onload = resolve;
+  bridge.onerror = reject;
+  doc.head.append(bridge);
+});
+const frameConfig = frame.contentWindow.__chessTestConfig;
+await test("Public CSP blocks eval and inline scripts", async () => {
+  let denied = false;
+  try { frame.contentWindow.eval("1 + 1"); } catch { denied = true; }
+  assert(denied, "unsafe-eval must remain disabled");
+  const inline = doc.createElement("script");
+  inline.textContent = "window.__inlineSecurityProbe = true";
+  doc.head.append(inline);
+  await sleep(20);
+  assert(!frame.contentWindow.__inlineSecurityProbe, "inline scripts must remain blocked");
+  inline.remove();
+});
 const frameOriginalConfig = { ...frameConfig };
 Object.assign(frameConfig, {
   USE_API: false,
@@ -524,10 +544,7 @@ await test("New Game invalidates an in-flight response; Black auto-flips and AI 
   assert(doc.getElementById("undo-button").disabled);
 });
 await test("UI API failure preserves board, Retry succeeds, resignation invalidates pending move", async () => {
-  const configUrl = new URL("../js/config.js", import.meta.url).href;
-  const config = (
-    await frame.contentWindow.eval(`import(${JSON.stringify(configUrl)})`)
-  ).CONFIG;
+  const config = frameConfig;
   const savedFetch = frame.contentWindow.fetch;
   try {
     config.USE_API = true;
@@ -726,10 +743,7 @@ await test("No clock mode and actual clock displays track the moving side", () =
   doc.getElementById("time-control").value = "600";
 });
 await test("Connection Settings save URL, show identity and engine info, recover and stay offline", async () => {
-  const configUrl = new URL("../js/config.js", import.meta.url).href;
-  const config = (
-    await frame.contentWindow.eval(`import(${JSON.stringify(configUrl)})`)
-  ).CONFIG;
+  const config = frameConfig;
   const saved = { ...config },
     savedFetch = frame.contentWindow.fetch;
   const storage = ["apiUrl", "useApi", "autoFallback", "showEngineInfo"].map(

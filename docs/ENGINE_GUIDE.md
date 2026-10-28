@@ -1,6 +1,8 @@
+> Historical architecture reference. For current fresh 30M defaults and public deployment, use [FULL_PIPELINE.md](FULL_PIPELINE.md) and [PUBLIC_DEPLOYMENT.md](PUBLIC_DEPLOYMENT.md).
+
 # Chess engine implementation and operation
 
-Implementation snapshot: October 27, 2026. This document supersedes the search and promotion descriptions in the October 26 PDF. The PDF remains a historical explanation of the dense architecture and deployment pipeline.
+Implementation snapshot: October 27, 2026. **Updated October 28:** the default Colab workflow is now `full_pipeline`; follow [FULL_PIPELINE.md](FULL_PIPELINE.md) for current training and deployment instructions. The dense-mode instructions below describe the retained legacy mode. This document supersedes the search and promotion descriptions in the October 26 PDF. The PDF remains a historical explanation of the dense architecture and deployment pipeline.
 
 ## What changed for your existing model
 

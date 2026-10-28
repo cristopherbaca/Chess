@@ -9,13 +9,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import chess
 from unittest.mock import patch
 from test_notebooks import TRAIN, source
 
 
 class TrainingFlowTests(unittest.TestCase):
     def test_gpu_and_parameter_cells_run_sequentially_and_resume(self):
-        for mode in ('gpu_neuroevolution', 'parameter_evolution'):
+        for mode in ('gpu_neuroevolution', 'parameter_evolution', 'full_pipeline'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
                 scope = {'importlib': importlib, 'subprocess': subprocess}
                 exec(compile(source(TRAIN, 'train-config'), 'train-config', 'exec'), scope)
@@ -30,6 +31,15 @@ class TrainingFlowTests(unittest.TestCase):
                 for settings in cfg['difficulty'].values():
                     settings.update(seconds=.02, nodes=64, depth=2)
                 root = Path(directory)
+                if mode == 'full_pipeline':
+                    boards = [chess.Board() for _ in range(3)]
+                    boards[1].push_uci('e2e4'); boards[2].push_uci('d2d4')
+                    labels = root / 'labels.jsonl'
+                    labels.write_text('\n'.join(json.dumps({'fen': b.fen(), 'game_id': str(i), 'cp_white': 0,
+                        'split': split}) for i, (b, split) in enumerate(zip(boards, ['train', 'validation', 'test']))))
+                    cfg.update(pipeline_source_run='', pipeline_labels=str(labels), pipeline_sparse_epochs=1,
+                               pipeline_validation_pairs=1, pipeline_move_seconds=.001, pipeline_nodes=1,
+                               generations=0, gpu_generations=0)
                 for name in ('models', 'logs', 'checkpoints', 'pgn'):
                     (root / name).mkdir()
                 scope.update(ROOT=root, MODELS=root / 'models')
@@ -40,10 +50,11 @@ class TrainingFlowTests(unittest.TestCase):
                             sys.modules.pop(name, None)
                         for identifier in ('train-engine', 'train-run', 'train-export'):
                             exec(compile(source(TRAIN, identifier), identifier, 'exec'), scope)
-                        self.assertEqual(scope['STATE']['generation'], 1)
+                        self.assertEqual(scope['STATE']['cycle'] if mode == 'full_pipeline' else scope['STATE']['generation'], 1)
                         before = (root / 'models/latest_champion.json').read_bytes()
                         exec(compile(source(TRAIN, 'train-run'), 'train-run', 'exec'), scope)
-                        self.assertEqual(scope['STATE']['generation'], 1)
+                        self.assertEqual(scope['STATE']['cycle'] if mode == 'full_pipeline' else scope['STATE']['generation'],
+                                         2 if mode == 'full_pipeline' else 1)
                         self.assertEqual((root / 'models/latest_champion.json').read_bytes(), before)
                 finally:
                     sys.path[:] = old_path
