@@ -12,9 +12,9 @@
     />
     <title>Chess</title>
     <link rel="stylesheet" href="css/variables.css" />
-    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/layout.css?v=engine-ui-6" />
     <link rel="stylesheet" href="css/board.css" />
-    <link rel="stylesheet" href="css/components.css?v=engine-ui-4" />
+    <link rel="stylesheet" href="css/components.css?v=engine-ui-6" />
   </head>
   <body>
     <svg
@@ -172,8 +172,7 @@
           </div>
         </div>
         <div class="board-footer">
-          <span id="board-mode">10 min · Casual game</span
-          ><button
+          <button
             id="settings-button"
             class="quiet-button"
             aria-label="Open settings"
@@ -222,8 +221,10 @@
                 <svg><use href="#icon-robot" /></svg>
               </div>
               <select id="opponent" name="opponent">
-                <option value="ai">AI opponent</option>
-                <option value="local">Local 2 players</option>
+                <option value="local">1 vs 1</option>
+                <option value="random">Random engine</option>
+                <option value="stockfish">Cristopher V1 (≈2750 Elo, estimated)</option>
+                <option value="cristopher">Cristopher V2 (unreleased)</option>
               </select>
             </div>
             <fieldset class="color-field">
@@ -296,9 +297,6 @@
               legal moves.
             </p>
           </form>
-          <div class="setup-footer">
-            Press Play to start the game and clock.
-          </div>
         </section>
         <section
           id="game-pane"
@@ -431,11 +429,6 @@
             ><span>Casual · Unrated</span>
           </div>
         </section>
-        <div class="connection-row">
-          <span id="connection" class="connection" role="status"
-            ><i></i><span>Connection · Local placeholder</span></span
-          >
-        </div>
       </aside>
     </main>
     <nav class="mobile-actions" aria-label="Quick game actions">
@@ -497,14 +490,8 @@
         /></label>
       </div>
       <fieldset class="api-settings">
-        <legend>AI engine</legend>
-        <label class="field-label" for="ai-engine">Engine</label>
-        <select id="ai-engine">
-          <option value="random">Random moves (offline)</option>
-          <option value="cristopher">My model — Cristopher</option>
-          <option value="stockfish">Cristopher V2 (≈2750 Elo, estimated)</option>
-        </select>
-        <p id="stockfish-help" class="form-note" hidden>Cristopher V2 always requests maximum strength: depth 18 and 100 ms of thinking time. The service may return a lower completed depth. Elo is an approximate estimate, not a measured rating. Your board position is sent to an external engine service when it plays; no Colab runtime or key is needed.</p>
+        <legend>Engine settings</legend>
+        <p id="stockfish-help" class="form-note" hidden>Cristopher V1 always requests maximum strength: depth 18 and 100 ms of thinking time. The service may return a lower completed depth. Elo is an approximate estimate, not a measured rating. Your board position is sent to an external engine service when it plays; no Colab runtime or key is needed.</p>
         <div id="cristopher-settings">
           <div class="settings-toggles">
             <label>Use AI server <input id="use-api" type="checkbox" role="switch" /></label>
@@ -601,6 +588,6 @@
       ><p class="startup-message">Enable JavaScript to play chess.</p></noscript
     >
     <script src="js/startup.js" defer></script>
-    <script type="module" src="js/main.js?v=engine-ui-4"></script>
+    <script type="module" src="js/main.js?v=engine-ui-6"></script>
   </body>
 </html>

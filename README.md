@@ -31,7 +31,7 @@ Training also reports **relative Elo against a fixed classical baseline**, with 
 1. Upload the latest [vendor/deploy.ipynb](vendor/deploy.ipynb) to a separate Colab runtime.
 2. Leave `WEBSITE_ORIGINS = '*'` to accept requests from any website. An exact comma-separated origin list is optional if you later want restrictions.
 3. Choose **Run all**. It loads only the new `MyDrive/chess_30m/models/` champion, verifies its manifest, starts the API, tests it and returns the HTTPS URL. It does not train.
-4. Paste the URL into the game's **Settings → AI engine → My model — Cristopher → Server URL**, enable **Use AI server**, and select an AI opponent. The API is used only when AI is selected and the toggle is enabled.
+4. Paste the URL into the game's **Settings → Server URL**, enable **Use AI server**, and select an AI opponent. The API is used only when AI is selected and the toggle is enabled.
 
 Public connection checks retry every three seconds without an attempt limit until they pass. Interrupt the Colab cell to stop retries and close the tunnel.
 
@@ -63,7 +63,7 @@ The `_site/` directory is generated and ignored by Git. GitHub Pages hosts the i
 
 ## Choose the AI engine
 
-In **Settings → AI engine**, select **Random moves** for offline play, **My model — Cristopher** to enter your Colab server URL (keep **Use AI server** enabled), or **Cristopher V2** (Stockfish 18) through the free [Chess-API.com service](https://chess-api.com/). Stockfish needs no key or Colab runtime; the provider receives the current board position when it plays. Cristopher V2 always requests the free service's maximum depth of 18 and maximum thinking time of 100 ms, with one principal variation. Its difficulty controls are hidden; the custom Cristopher model keeps its own difficulty settings. The displayed 2750 Elo is the provider's approximate estimate, not a measured rating for this app. Engine info shows the actual returned depth, which can be lower than requested. The service controls its hosted version and availability. Stockfish shows “Connected” after a successful move response; local two-player games make no automatic API requests. Changing engines cancels a pending move; use Retry to continue.
+On the main screen under **Play against**, select **1 vs 1** for local two-player games, **Random engine** for offline AI, **Cristopher V2 (unreleased)** for your Colab model (enter its URL in Settings and keep **Use AI server** enabled), or **Cristopher V1** (Stockfish 18) through the free [Chess-API.com service](https://chess-api.com/). Stockfish needs no key or Colab runtime; the provider receives the current board position when it plays. Cristopher V1 always requests the free service's maximum depth of 18 and maximum thinking time of 100 ms, with one principal variation. Its difficulty controls are hidden; the custom Cristopher model keeps its own difficulty settings. The displayed 2750 Elo is the provider's approximate estimate, not a measured rating for this app. Engine info shows the actual returned depth, which can be lower than requested. The service controls its hosted version and availability. Stockfish shows “Connected” after a successful move response; local two-player games make no automatic API requests. Changing engines cancels a pending move; use Retry to continue.
 
 ## Run locally and play
 

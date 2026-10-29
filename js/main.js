@@ -1,8 +1,8 @@
 import { Chess } from "../vendor/chess.js";
-import { bindConnection } from "./ui/connection.js?v=engine-ui-4";
+import { bindConnection } from "./ui/connection.js?v=engine-ui-6";
 import { Board } from "./board.js";
-import { CONFIG, usesRemoteEngine, engineName } from "./config.js?v=engine-ui-4";
-import { getCristopherMove, cancelCristopherMove } from "./cristopher.js?v=engine-ui-4";
+import { CONFIG, activeEngine, usesRemoteEngine, engineName } from "./config.js?v=engine-ui-6";
+import { getCristopherMove, cancelCristopherMove } from "./cristopher.js?v=engine-ui-6";
 import {
   PIECE_NAMES,
   colorName,
@@ -235,8 +235,7 @@ function currentStatus() {
   if (!state.started)
     return {
       title: "Ready to play",
-      detail:
-        "Choose your opponent and press Play to start the game and clock.",
+      detail: "",
     };
   if (state.timeout)
     return {
@@ -321,8 +320,6 @@ function render() {
       : CONFIG.ENGINE === "stockfish"
         ? "Maximum"
         : `${state.difficulty[0].toUpperCase()}${state.difficulty.slice(1)}`;
-  $("board-mode").textContent =
-    `${state.timeControl ? `${state.timeControl / 60} min` : "No clock"} · Casual game`;
   renderPlayer("top-player", otherColor(state.orientation));
   renderPlayer("bottom-player", state.orientation);
   connection.paint();
@@ -344,11 +341,7 @@ function renderPlayer(id, color) {
   const element = $(id);
   const ai = state.opponent === "ai" && color !== state.humanColor;
   element.dataset.color = color;
-  let chip = element.querySelector(".ai-connection");
-  if (!chip) {
-    chip = document.createElement("span");
-    chip.className = "ai-connection";
-    element.querySelector(".player-heading").append(chip);
+  if (!element.querySelector(".engine-info")) {
     const details = document.createElement("details");
     details.className = "engine-info";
     const summary = document.createElement("summary");
@@ -356,7 +349,6 @@ function renderPlayer(id, color) {
     details.append(summary, document.createElement("span"));
     element.querySelector(".player-description").after(details);
   }
-  chip.hidden = !ai;
   const details = element.querySelector(".engine-info");
   const info = state.engineInfo;
   details.hidden = !ai || !CONFIG.SHOW_ENGINE_INFO || !info || info.placeholder;
@@ -579,13 +571,14 @@ $("new-game-form").addEventListener("submit", (event) => {
   const data = new FormData(event.currentTarget);
   startGame({
     color: data.get("color"),
-    opponent: data.get("opponent"),
+    opponent: data.get("opponent") === "local" ? "local" : "ai",
     difficulty: $("difficulty").value,
     time: data.get("time"),
   });
 });
-$("opponent").addEventListener("change", () => {
+function selectOpponent() {
   const local = $("opponent").value === "local";
+  if (!local) connection.selectEngine($("opponent").value);
   $("difficulty").disabled = local;
   $("difficulty-note").hidden = local;
   document.querySelectorAll("[data-difficulty]").forEach((button) => {
@@ -594,7 +587,9 @@ $("opponent").addEventListener("change", () => {
   document.querySelector(".opponent-field .avatar").innerHTML =
     avatarMarkup(!local);
   connection.sync();
-});
+}
+$("opponent").addEventListener("input", selectOpponent);
+$("opponent").addEventListener("change", selectOpponent);
 for (const button of document.querySelectorAll("[data-difficulty]")) {
   button.addEventListener("click", () => {
     $("difficulty").value = button.dataset.difficulty;
@@ -725,6 +720,7 @@ document.addEventListener("keydown", (event) => {
     render();
   }
 });
+$("opponent").value = activeEngine();
 const connection = bindConnection(
   (key) => {
     if (!key || key === "USE_API" || key === "ENGINE") {
@@ -736,7 +732,7 @@ const connection = bindConnection(
     render();
   },
   {
-    isEnabled: () => usesRemoteEngine() && (state.started ? state.opponent : $("opponent").value) === "ai",
+    isEnabled: () => usesRemoteEngine() && (state.started ? state.opponent === "ai" : $("opponent").value !== "local"),
     idleLabel: () => (state.started ? state.opponent : $("opponent").value) === "local"
       ? "Local two-player · API inactive"
       : usesRemoteEngine()

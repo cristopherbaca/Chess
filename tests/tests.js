@@ -1,12 +1,12 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js?v=engine-ui-4";
+import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js?v=engine-ui-6";
 import {
   getCristopherMove,
   checkCristopherHealth,
   checkHealth,
   cancelCristopherMove,
   CristopherError,
-} from "../js/cristopher.js?v=engine-ui-4";
+} from "../js/cristopher.js?v=engine-ui-6";
 import { gameStatus, materialSummary, toUci, undoTurn } from "../js/game.js";
 import { ChessClock, formatTime } from "../js/ui/clock.js";
 
@@ -306,19 +306,19 @@ await test("Stockfish uses the free endpoint without model headers and validates
       assert(result.move === "e2e4" && result.info.eval === -0.2 && result.info.depth === depth);
     }
     globalThis.fetch = async () => new Response(JSON.stringify({ move: "e2e5" }));
-    await rejects(() => getCristopherMove(input), "Cristopher V2 returned an invalid move");
+    await rejects(() => getCristopherMove(input), "Cristopher V1 returned an invalid move");
     globalThis.fetch = async () => new Response(JSON.stringify({ move: "a7a8q" }));
     assert((await getCristopherMove({ ...input, fen: "7k/P7/8/8/8/8/8/7K w - - 0 1" })).move === "a7a8q");
     globalThis.fetch = async () => new Response("", { status: 429 });
     await rejects(() => getCristopherMove(input), "Too many requests");
     globalThis.fetch = async () => new Response("{");
-    await rejects(() => getCristopherMove(input), "Cristopher V2 sent an unreadable response");
+    await rejects(() => getCristopherMove(input), "Cristopher V1 sent an unreadable response");
     globalThis.fetch = (_url, { signal }) => new Promise((_resolve, reject) => {
       signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
     });
     CONFIG.REQUEST_TIMEOUT_MS = 10;
     CONFIG.HARD_REQUEST_TIMEOUT_MS = 10;
-    await rejects(() => getCristopherMove(input), "Cristopher V2 took too long");
+    await rejects(() => getCristopherMove(input), "Cristopher V1 took too long");
     const pending = getCristopherMove(input);
     cancelCristopherMove();
     await rejects(() => pending, "cancelled");
@@ -378,15 +378,26 @@ const move = (from, to) => {
   square(to).click();
 };
 function newGame(opponent = "local", color = "w") {
+  const useApi = frameConfig.USE_API;
   click("new-game-button");
   doc.querySelector(`[name=color][value=${color}]`).checked = true;
-  doc.getElementById("opponent").value = opponent;
+  doc.getElementById("opponent").value = opponent === "ai" ? frameConfig.ENGINE : opponent;
   doc.getElementById("opponent").dispatchEvent(new Event("change"));
+  // Existing offline-model scenarios explicitly turn its server switch off.
+  if (opponent === "ai" && frameConfig.ENGINE === "cristopher" && !useApi) {
+    doc.getElementById("use-api").checked = false;
+    doc.getElementById("use-api").dispatchEvent(new frame.contentWindow.Event("change"));
+  }
   doc.getElementById("new-game-form").requestSubmit();
 }
 
 await test("Before Play, the clock stays paused and the interface has one Settings button", async () => {
   assert(doc.getElementById("game-status").textContent === "Ready to play");
+  assert([...doc.getElementById("opponent").options].map(option => option.value).join() === "local,random,stockfish,cristopher");
+  assert(doc.getElementById("new-game-form").contains(doc.getElementById("opponent")));
+  assert(!doc.getElementById("settings-dialog").querySelector("#ai-engine, #opponent"), "Engine selection belongs on the main screen");
+  assert(!doc.querySelector("#board-mode, .connection-row, .ai-connection, .setup-footer"));
+  assert(!doc.querySelector("main").textContent.includes("Press Play to start the game and clock."));
   assert(!doc.querySelector(".side-nav, .player-name, .brand-label"));
   assert(doc.querySelectorAll('[aria-label="Open settings"]').length === 1);
   assert(!doc.querySelector(".player-clock.running"));
@@ -613,7 +624,7 @@ await test("UI API failure preserves board, Retry succeeds, resignation invalida
       "retry",
     );
     assert(doc.getElementById("ai-error").hidden);
-    assert(doc.getElementById("connection").textContent.includes("Connected"));
+    assert(doc.getElementById("api-status").textContent.includes("Connected"));
   } finally {
     config.USE_API = false;
     frame.contentWindow.fetch = savedFetch;
@@ -847,7 +858,7 @@ await test("Connection Settings save URL, show identity and engine info, recover
     assert(
       doc
         .getElementById("error-text")
-        .textContent.includes("Cristopher lost connection"),
+        .textContent.includes("Cristopher V2 lost connection"),
     );
     assert(!doc.getElementById("undo-button").disabled);
     click("reconnect-button");
@@ -931,16 +942,16 @@ await test("Local games stop API checks; confirmed connection stays visible duri
     doc.dispatchEvent(new w.Event("visibilitychange"));
     await sleep(60);
     assert(calls === before, "Local game must not ping even with server toggle on");
-    assert(doc.getElementById("connection").textContent.includes("API inactive"));
+    assert(doc.getElementById("api-status").textContent.includes("API inactive"));
     newGame("ai");
-    await until(() => doc.getElementById("connection").textContent.includes("Connected"), "AI connection");
+    await until(() => doc.getElementById("api-status").textContent.includes("Connected"), "AI connection");
     w.fetch = () => new Promise(resolve => { resolveHealth = resolve; });
     doc.dispatchEvent(new w.Event("visibilitychange"));
-    assert(doc.getElementById("connection").textContent.includes("Connected"), "Background checks must not replace Connected with Connecting");
+    assert(doc.getElementById("api-status").textContent.includes("Connected"), "Background checks must not replace Connected with Connecting");
     resolveHealth(new Response(JSON.stringify({ status: "ok" })));
     await sleep(50);
     newGame("local");
-    assert(doc.getElementById("connection").textContent.includes("API inactive"));
+    assert(doc.getElementById("api-status").textContent.includes("API inactive"));
   } finally {
     frameConfig.USE_API = false;
     newGame("local");
@@ -953,8 +964,8 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     const key = w.localStorage.key(i); return [key, w.localStorage.getItem(key)];
   }));
   const select = (value) => {
-    doc.getElementById("ai-engine").value = value;
-    doc.getElementById("ai-engine").dispatchEvent(new w.Event("change"));
+    doc.getElementById("opponent").value = value;
+    doc.getElementById("opponent").dispatchEvent(new w.Event("change"));
   };
   let calls = 0;
   try {
@@ -966,7 +977,7 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     };
     // A selection must survive an unrelated render before the native change
     // event, then activate on input even if change is delayed until blur.
-    const engineSelect = doc.getElementById("ai-engine");
+    const engineSelect = doc.getElementById("opponent");
     engineSelect.value = "stockfish";
     click("engine-info-toggle");
     assert(engineSelect.value === "stockfish", "Rendering must not reset the user's pending selection");
@@ -975,23 +986,24 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     click("engine-info-toggle");
     engineSelect.dispatchEvent(new w.Event("change"));
     assert(w.localStorage.getItem("chess.engine") === "stockfish");
+    assert(doc.getElementById("opponent").selectedOptions[0].textContent.includes("Cristopher V1"));
     assert(doc.getElementById("cristopher-settings").hidden);
     assert(!doc.getElementById("stockfish-help").hidden);
-    assert(doc.getElementById("difficulty-field").hidden, "V2 always uses maximum strength");
+    assert(doc.getElementById("difficulty-field").hidden, "V1 always uses maximum strength");
     doc.dispatchEvent(new w.Event("visibilitychange"));
     await sleep(30);
-    assert(calls === 0 && doc.getElementById("connection").textContent.includes("API inactive"));
+    assert(calls === 0 && doc.getElementById("api-status").textContent.includes("API inactive"));
     newGame("ai");
-    assert(calls === 0 && doc.getElementById("connection").textContent.includes("ready to connect"));
+    assert(calls === 0 && doc.getElementById("api-status").textContent.includes("ready to connect"));
     move("e2", "e4");
     await until(() => doc.getElementById("move-count").textContent === "2 played", "Stockfish move");
-    assert(calls === 1 && doc.getElementById("connection").textContent.includes("Connected"));
-    assert(doc.getElementById("api-health-detail").textContent.includes("Cristopher V2 · Depth 12"));
+    assert(calls === 1 && doc.getElementById("api-status").textContent.includes("Connected"));
+    assert(doc.getElementById("api-health-detail").textContent.includes("Cristopher V1 · Depth 12"));
     click("undo-button");
     w.fetch = async () => new Response("", { status: 429 });
     move("e2", "e4");
     await until(() => !doc.getElementById("ai-error").hidden, "Stockfish rejection");
-    assert(doc.getElementById("connection").textContent.includes("Disconnected"));
+    assert(doc.getElementById("api-status").textContent.includes("Disconnected"));
     click("undo-button");
     let resolveMove, moveSignal;
     w.fetch = (_url, { signal }) => {
@@ -1010,6 +1022,7 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     await until(() => doc.getElementById("move-count").textContent === "2 played", "random retry");
     newGame("local");
     select("cristopher");
+    assert(doc.getElementById("opponent").selectedOptions[0].textContent === "Cristopher V2 (unreleased)");
     assert(!doc.getElementById("cristopher-settings").hidden && frameConfig.USE_API);
     assert(!doc.getElementById("difficulty-field").hidden, "The custom model keeps its difficulty controls");
     assert(frameConfig.API_URL === saved.API_URL, "Switching engines must preserve the model URL");

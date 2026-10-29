@@ -1,5 +1,5 @@
-import { CONFIG, activeEngine, saveApiSettings, hasMixedContent } from "../config.js?v=engine-ui-4";
-import { checkHealth } from "../cristopher.js?v=engine-ui-4";
+import { CONFIG, activeEngine, saveApiSettings, hasMixedContent } from "../config.js?v=engine-ui-6";
+import { checkHealth } from "../cristopher.js?v=engine-ui-6";
 
 const $ = (id) => document.getElementById(id);
 export function bindConnection(onChange, { isEnabled, idleLabel }) {
@@ -8,26 +8,17 @@ export function bindConnection(onChange, { isEnabled, idleLabel }) {
     generation = 0;
   let status = { state: "local", label: idleLabel() };
   const paint = () => {
-    const option = $("ai-engine").querySelector('[value="stockfish"]');
-    const title = "Cristopher V2 (≈2750 Elo, estimated)";
-    if (option.textContent !== title) option.textContent = title;
     $("cristopher-settings").hidden = CONFIG.ENGINE !== "cristopher";
     $("stockfish-help").hidden = CONFIG.ENGINE !== "stockfish";
-    $("difficulty-field").hidden = CONFIG.ENGINE === "stockfish";
-    $("connection").className = `connection ${status.state}`;
-    $("connection").querySelector("span").textContent = status.label;
+    $("difficulty-field").hidden = $("opponent").value === "stockfish";
     $("api-status").className = `api-status ${status.state}`;
     $("api-status").textContent = status.label;
-    for (const chip of document.querySelectorAll(".ai-connection")) {
-      chip.className = `ai-connection ${status.state}`;
-      chip.textContent = status.label;
-    }
     $("mixed-content-warning").hidden = CONFIG.ENGINE !== "cristopher" || !hasMixedContent();
     $("difficulty-note").textContent =
       activeEngine() === "stockfish"
-        ? "Cristopher V2 uses maximum strength: depth 18 and the service’s maximum thinking time."
+        ? "Cristopher V1 uses maximum strength: depth 18 and the service’s maximum thinking time."
         : activeEngine() === "cristopher"
-        ? "Uses your API server. Start it in Colab and set its URL in Settings."
+        ? "Cristopher V2 is unreleased. After training and deploying your model in Colab, enter its server URL in Settings."
         : "Random legal moves on your device. No API or Colab runtime is used.";
   };
   const cancelHealth = () => {
@@ -64,7 +55,7 @@ export function bindConnection(onChange, { isEnabled, idleLabel }) {
       if (activeEngine() === "stockfish") {
         // This provider has no documented health endpoint. Confirm on a move response.
         if (!["online", "offline"].includes(status.state))
-          status = { state: "local", label: "Cristopher V2 · ready to connect" };
+          status = { state: "local", label: "Cristopher V1 · ready to connect" };
         paint();
         return;
       }
@@ -99,10 +90,8 @@ export function bindConnection(onChange, { isEnabled, idleLabel }) {
     }
   }
   $("api-url").value = CONFIG.API_URL;
-  $("ai-engine").value = CONFIG.ENGINE;
-  function selectEngine() {
-    const engine = $("ai-engine").value;
-    if (engine === CONFIG.ENGINE) return;
+  function selectEngine(engine) {
+    if (engine === CONFIG.ENGINE && (engine !== "cristopher" || CONFIG.USE_API)) return;
     saveApiSettings({ ENGINE: engine, ...(engine === "cristopher" ? { USE_API: true } : {}) });
     $("use-api").checked = CONFIG.USE_API;
     status = { state: "local", label: idleLabel() };
@@ -110,10 +99,6 @@ export function bindConnection(onChange, { isEnabled, idleLabel }) {
     onChange("ENGINE");
     schedule();
   }
-  // Native selects can emit input before committing change. App renders must
-  // never restore the previous selection while the user is choosing an engine.
-  $("ai-engine").addEventListener("input", selectEngine);
-  $("ai-engine").addEventListener("change", selectEngine);
   $("api-url").addEventListener("input", () =>
     $("api-url").setCustomValidity(""),
   );
@@ -152,15 +137,16 @@ export function bindConnection(onChange, { isEnabled, idleLabel }) {
   paint();
   schedule();
   return {
+    selectEngine,
     refresh,
     paint,
     sync: schedule,
     connected(info) {
       if (!isEnabled()) return;
       if (status.state !== "online")
-        status = { state: "online", label: activeEngine() === "stockfish" ? "Cristopher V2 · Connected" : "Connected" };
+        status = { state: "online", label: activeEngine() === "stockfish" ? "Cristopher V1 · Connected" : "Connected" };
       if (activeEngine() === "stockfish")
-        $("api-health-detail").textContent = `Cristopher V2${Number.isFinite(info?.depth) ? ` · Depth ${info.depth}` : ""}`;
+        $("api-health-detail").textContent = `Cristopher V1${Number.isFinite(info?.depth) ? ` · Depth ${info.depth}` : ""}`;
       paint();
     },
     disconnected() {

@@ -1,5 +1,5 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG, activeEngine, STOCKFISH_API_URL } from "./config.js?v=engine-ui-4";
+import { CONFIG, activeEngine, STOCKFISH_API_URL } from "./config.js?v=engine-ui-6";
 
 export class CristopherError extends Error {
   constructor(code, message) {
@@ -21,7 +21,7 @@ async function request(
   engine = "cristopher",
 ) {
   const stockfish = engine === "stockfish";
-  const name = stockfish ? "Cristopher V2" : "Cristopher";
+  const name = stockfish ? "Cristopher V1" : "Cristopher V2";
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -50,7 +50,7 @@ async function request(
           : response.status === 503
             ? "The AI is busy. Please wait a moment and retry."
             : response.status === 403
-              ? (stockfish ? "The Cristopher V2 service refused this request. Please try again later." : "This website is not allowed by the API. Check WEBSITE_ORIGINS in deployment.")
+              ? (stockfish ? "The Cristopher V1 service refused this request. Please try again later." : "This website is not allowed by the API. Check WEBSITE_ORIGINS in deployment.")
               : `The AI server returned HTTP ${response.status}. Please try again.`,
       );
     return await response.json();
@@ -124,10 +124,10 @@ export async function getCristopherMove({ fen, history, difficulty }) {
     )
       throw new CristopherError(
         "illegal",
-        `${engine === "stockfish" ? "Cristopher V2" : "Cristopher"} returned an invalid move. Your board is safe. Please try again.`,
+        `${engine === "stockfish" ? "Cristopher V1" : "Cristopher V2"} returned an invalid move. Your board is safe. Please try again.`,
       );
     return { move: result.move, info: engine === "stockfish" ? {
-      engine: "Cristopher V2",
+      engine: "Cristopher V1",
       eval: Number.isFinite(result.eval) ? result.eval : undefined,
       depth: Number.isFinite(result.depth) ? result.depth : undefined,
       time_ms: Number.isFinite(result.time) ? result.time : undefined,
@@ -158,7 +158,7 @@ export async function checkHealth({ signal } = {}) {
       controller,
     );
     if (result?.status !== "ok")
-      throw new CristopherError("http", "Cristopher is not ready yet.");
+      throw new CristopherError("http", "Cristopher V2 is not ready yet.");
     return {
       ok: true,
       latency_ms: Math.round(performance.now() - started),

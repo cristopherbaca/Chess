@@ -1,4 +1,4 @@
-import { PUBLIC_API_URL } from "./public-config.js?v=engine-ui-4";
+import { PUBLIC_API_URL } from "./public-config.js?v=engine-ui-6";
 
 const saved = (key, fallback) => {
   try {
@@ -71,7 +71,7 @@ export function saveApiSettings(values) {
 export const activeEngine = () => CONFIG.ENGINE === "cristopher" && !CONFIG.USE_API
   ? "random" : CONFIG.ENGINE;
 export const usesRemoteEngine = () => activeEngine() !== "random";
-export const engineName = () => ({ random: "Random bot", cristopher: "Cristopher", stockfish: "Cristopher V2" })[activeEngine()];
+export const engineName = () => ({ random: "Random bot", cristopher: "Cristopher V2", stockfish: "Cristopher V1" })[activeEngine()];
 export const STOCKFISH_API_URL = "https://chess-api.com/v1";
 
 export function hasMixedContent(
