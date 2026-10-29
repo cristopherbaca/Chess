@@ -1,12 +1,12 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js?v=engine-ui-3";
+import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js?v=engine-ui-4";
 import {
   getCristopherMove,
   checkCristopherHealth,
   checkHealth,
   cancelCristopherMove,
   CristopherError,
-} from "../js/cristopher.js?v=engine-ui-3";
+} from "../js/cristopher.js?v=engine-ui-4";
 import { gameStatus, materialSummary, toUci, undoTurn } from "../js/game.js";
 import { ChessClock, formatTime } from "../js/ui/clock.js";
 
@@ -292,11 +292,11 @@ await test("Stockfish uses the free endpoint without model headers and validates
     CONFIG.USE_API = false;
     CONFIG.AUTO_FALLBACK = false;
     CONFIG.EXTRA_HEADERS = { Authorization: "private-model-key" };
-    for (const [difficulty, depth] of [["easy", 8], ["medium", 12], ["hard", 18]]) {
+    for (const [difficulty, depth] of [["easy", 18], ["medium", 18], ["hard", 18]]) {
       globalThis.fetch = async (url, options) => {
         assert(url === "https://chess-api.com/v1");
         const body = JSON.parse(options.body);
-        assert(body.fen === input.fen && body.depth === depth && body.variants === 1);
+        assert(body.fen === input.fen && body.depth === depth && body.variants === 1 && body.maxThinkingTime === 100);
         assert(!("history" in body));
         assert(Object.keys(options.headers).join() === "Content-Type", "Model headers must not leak to Stockfish");
         assert(options.credentials === "omit");
@@ -317,6 +317,7 @@ await test("Stockfish uses the free endpoint without model headers and validates
       signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
     });
     CONFIG.REQUEST_TIMEOUT_MS = 10;
+    CONFIG.HARD_REQUEST_TIMEOUT_MS = 10;
     await rejects(() => getCristopherMove(input), "Cristopher V2 took too long");
     const pending = getCristopherMove(input);
     cancelCristopherMove();
@@ -976,6 +977,7 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     assert(w.localStorage.getItem("chess.engine") === "stockfish");
     assert(doc.getElementById("cristopher-settings").hidden);
     assert(!doc.getElementById("stockfish-help").hidden);
+    assert(doc.getElementById("difficulty-field").hidden, "V2 always uses maximum strength");
     doc.dispatchEvent(new w.Event("visibilitychange"));
     await sleep(30);
     assert(calls === 0 && doc.getElementById("connection").textContent.includes("API inactive"));
@@ -1009,6 +1011,7 @@ await test("Engine selector persists, routes Stockfish, and cancels stale moves 
     newGame("local");
     select("cristopher");
     assert(!doc.getElementById("cristopher-settings").hidden && frameConfig.USE_API);
+    assert(!doc.getElementById("difficulty-field").hidden, "The custom model keeps its difficulty controls");
     assert(frameConfig.API_URL === saved.API_URL, "Switching engines must preserve the model URL");
   } finally {
     Object.assign(frameConfig, saved);

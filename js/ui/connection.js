@@ -1,20 +1,19 @@
-import { CONFIG, activeEngine, saveApiSettings, hasMixedContent } from "../config.js?v=engine-ui-3";
-import { checkHealth } from "../cristopher.js?v=engine-ui-3";
+import { CONFIG, activeEngine, saveApiSettings, hasMixedContent } from "../config.js?v=engine-ui-4";
+import { checkHealth } from "../cristopher.js?v=engine-ui-4";
 
 const $ = (id) => document.getElementById(id);
-export function bindConnection(onChange, { isEnabled, idleLabel, getDifficulty }) {
+export function bindConnection(onChange, { isEnabled, idleLabel }) {
   let timer,
     healthController,
     generation = 0;
   let status = { state: "local", label: idleLabel() };
   const paint = () => {
-    const elo = { medium: "≈2350 Elo, estimated", hard: "≈2750 Elo, estimated" }[getDifficulty()]
-      || "Elo unrated";
     const option = $("ai-engine").querySelector('[value="stockfish"]');
-    const title = `Cristopher V2 (${elo})`;
+    const title = "Cristopher V2 (≈2750 Elo, estimated)";
     if (option.textContent !== title) option.textContent = title;
     $("cristopher-settings").hidden = CONFIG.ENGINE !== "cristopher";
     $("stockfish-help").hidden = CONFIG.ENGINE !== "stockfish";
+    $("difficulty-field").hidden = CONFIG.ENGINE === "stockfish";
     $("connection").className = `connection ${status.state}`;
     $("connection").querySelector("span").textContent = status.label;
     $("api-status").className = `api-status ${status.state}`;
@@ -26,7 +25,7 @@ export function bindConnection(onChange, { isEnabled, idleLabel, getDifficulty }
     $("mixed-content-warning").hidden = CONFIG.ENGINE !== "cristopher" || !hasMixedContent();
     $("difficulty-note").textContent =
       activeEngine() === "stockfish"
-        ? "Cristopher V2 runs online. Difficulty requests search depths 8, 12, or 18."
+        ? "Cristopher V2 uses maximum strength: depth 18 and the service’s maximum thinking time."
         : activeEngine() === "cristopher"
         ? "Uses your API server. Start it in Colab and set its URL in Settings."
         : "Random legal moves on your device. No API or Colab runtime is used.";

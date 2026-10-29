@@ -1,4 +1,4 @@
-import { PUBLIC_API_URL } from "./public-config.js?v=engine-ui-3";
+import { PUBLIC_API_URL } from "./public-config.js?v=engine-ui-4";
 
 const saved = (key, fallback) => {
   try {

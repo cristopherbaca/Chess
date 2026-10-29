@@ -1,5 +1,5 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG, activeEngine, STOCKFISH_API_URL } from "./config.js?v=engine-ui-3";
+import { CONFIG, activeEngine, STOCKFISH_API_URL } from "./config.js?v=engine-ui-4";
 
 export class CristopherError extends Error {
   constructor(code, message) {
@@ -105,10 +105,10 @@ export async function getCristopherMove({ fen, history, difficulty }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(engine === "stockfish"
-          ? { fen, variants: 1, depth: ({ easy: 8, medium: 12, hard: 18 })[difficulty] || 12, maxThinkingTime: 100 }
+          ? { fen, variants: 1, depth: 18, maxThinkingTime: 100 }
           : { fen, history, difficulty }),
       },
-      difficulty === "hard"
+      engine === "stockfish" || difficulty === "hard"
         ? CONFIG.HARD_REQUEST_TIMEOUT_MS
         : CONFIG.REQUEST_TIMEOUT_MS,
       controller,

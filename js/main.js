@@ -1,8 +1,8 @@
 import { Chess } from "../vendor/chess.js";
-import { bindConnection } from "./ui/connection.js?v=engine-ui-3";
+import { bindConnection } from "./ui/connection.js?v=engine-ui-4";
 import { Board } from "./board.js";
-import { CONFIG, usesRemoteEngine, engineName } from "./config.js?v=engine-ui-3";
-import { getCristopherMove, cancelCristopherMove } from "./cristopher.js?v=engine-ui-3";
+import { CONFIG, usesRemoteEngine, engineName } from "./config.js?v=engine-ui-4";
+import { getCristopherMove, cancelCristopherMove } from "./cristopher.js?v=engine-ui-4";
 import {
   PIECE_NAMES,
   colorName,
@@ -318,7 +318,9 @@ function render() {
   $("difficulty-label").textContent =
     state.opponent === "local"
       ? "Local · 2 players"
-      : `${state.difficulty[0].toUpperCase()}${state.difficulty.slice(1)}`;
+      : CONFIG.ENGINE === "stockfish"
+        ? "Maximum"
+        : `${state.difficulty[0].toUpperCase()}${state.difficulty.slice(1)}`;
   $("board-mode").textContent =
     `${state.timeControl ? `${state.timeControl / 60} min` : "No clock"} · Casual game`;
   renderPlayer("top-player", otherColor(state.orientation));
@@ -734,7 +736,6 @@ const connection = bindConnection(
     render();
   },
   {
-    getDifficulty: () => state.started ? state.difficulty : $("difficulty").value,
     isEnabled: () => usesRemoteEngine() && (state.started ? state.opponent : $("opponent").value) === "ai",
     idleLabel: () => (state.started ? state.opponent : $("opponent").value) === "local"
       ? "Local two-player · API inactive"
