@@ -1,8 +1,8 @@
 import { Chess } from "../vendor/chess.js";
-import { bindConnection } from "./ui/connection.js";
+import { bindConnection } from "./ui/connection.js?v=engine-ui-3";
 import { Board } from "./board.js";
-import { CONFIG } from "./config.js";
-import { getCristopherMove, cancelCristopherMove } from "./cristopher.js";
+import { CONFIG, usesRemoteEngine, engineName } from "./config.js?v=engine-ui-3";
+import { getCristopherMove, cancelCristopherMove } from "./cristopher.js?v=engine-ui-3";
 import {
   PIECE_NAMES,
   colorName,
@@ -173,7 +173,7 @@ async function requestAiMove() {
   state.aiNotice = "";
   state.cancelReady = false;
   const cancelTimer = setTimeout(() => {
-    if (requestId === state.requestId && CONFIG.USE_API) {
+    if (requestId === state.requestId && usesRemoteEngine()) {
       state.cancelReady = true;
       render();
     }
@@ -195,7 +195,7 @@ async function requestAiMove() {
       ...(result.move[4] ? { promotion: result.move[4] } : {}),
     });
     state.engineInfo = result.info;
-    if (!result.info?.placeholder) connection.connected();
+    if (!result.info?.placeholder) connection.connected(result.info);
     if (result.info?.placeholder && result.info?.fallback) {
       state.aiNotice =
         "API unavailable — the local fallback bot played this move.";
@@ -207,8 +207,8 @@ async function requestAiMove() {
     state.aiError =
       error.code === "cancelled"
         ? error.message
-        : `Cristopher lost connection. ${error.message || "Please try again."}`;
-    if (["network", "timeout"].includes(error.code)) connection.disconnected();
+        : `${engineName()} lost connection. ${error.message || "Please try again."}`;
+    if (["network", "timeout"].includes(error.code) || (CONFIG.ENGINE === "stockfish" && error.code !== "cancelled")) connection.disconnected();
     else if (error.code !== "cancelled") void connection.refresh();
   } finally {
     clearTimeout(cancelTimer);
@@ -278,11 +278,13 @@ function render() {
   });
   $("game-status").textContent = status.title;
   $("status-detail").textContent = state.busy
-    ? "Cristopher is thinking…"
+    ? `${engineName()} is thinking…`
     : state.aiError
       ? state.aiError.startsWith("Move request cancelled")
         ? "Request cancelled — retry when you’re ready."
-        : "Cristopher lost connection — retry or reconnect."
+        : state.aiError.startsWith("Connection settings changed")
+          ? state.aiError
+          : `${engineName()} lost connection — retry or reconnect.`
       : status.detail;
   $("status-icon").textContent = status.over
     ? "⚑"
@@ -594,6 +596,7 @@ $("opponent").addEventListener("change", () => {
 for (const button of document.querySelectorAll("[data-difficulty]")) {
   button.addEventListener("click", () => {
     $("difficulty").value = button.dataset.difficulty;
+    connection.paint();
     document
       .querySelectorAll("[data-difficulty]")
       .forEach((item) =>
@@ -722,7 +725,7 @@ document.addEventListener("keydown", (event) => {
 });
 const connection = bindConnection(
   (key) => {
-    if (!key || key === "USE_API") {
+    if (!key || key === "USE_API" || key === "ENGINE") {
       const pending = state.busy || Boolean(state.aiError);
       invalidateRequest();
       if (pending && isAiTurn() && !isOver())
@@ -731,10 +734,13 @@ const connection = bindConnection(
     render();
   },
   {
-    isEnabled: () => CONFIG.USE_API && (state.started ? state.opponent : $("opponent").value) === "ai",
+    getDifficulty: () => state.started ? state.difficulty : $("difficulty").value,
+    isEnabled: () => usesRemoteEngine() && (state.started ? state.opponent : $("opponent").value) === "ai",
     idleLabel: () => (state.started ? state.opponent : $("opponent").value) === "local"
       ? "Local two-player · API inactive"
-      : "Offline mode · random bot (no API)",
+      : usesRemoteEngine()
+        ? `${engineName()} · ready to connect`
+        : "Offline mode · random bot (no API)",
   },
 );
 $("cancel-ai").addEventListener("click", cancelCristopherMove);

@@ -23,6 +23,8 @@ from .matches import atomic_json, fingerprint, run_match, MatchConfig, implement
 from .training import evolve, GeneticConfig, load_state as load_parameters
 from .datasets import prepare_labels
 from .validation_cases import CASES
+from .storage import read_dense_checkpoint, prune_pipeline_exports, print_usage
+from .strength import measure as measure_strength
 
 VERSION = 'chess-full-pipeline-1'
 STAGES = ('dense', 'parameters', 'sparse', 'candidates', 'search', 'diagnostics')
@@ -115,7 +117,7 @@ def load(host, cfg, create=False):
         seed = None
         for path in paths:
             try:
-                candidate = torch.load(path, map_location='cpu', weights_only=True)
+                candidate = read_dense_checkpoint(path)
                 if candidate['signature'] != host.gpu_signature(candidate['CFG']):
                     continue
                 if not {'champion', 'mean', 'generation', 'rng'} <= set(candidate['state']):
@@ -332,16 +334,25 @@ def sparse_test_report(labels, model, path):
 
 
 def run(host, cfg):
+    print_usage(cfg['root'])
     state = load(host, cfg, create=True)
     publish(host, cfg, state)
     deadline = time.monotonic() + cfg['max_hours'] * 3600
     root = workspace(cfg)
+    rating_seconds = min(max(0., cfg.get('rating_minutes', 5.))*60, cfg['max_hours']*3600*.1) if cfg.get('rating_enabled', False) else 0
+    training_deadline = deadline - rating_seconds
+    prune_pipeline_exports(cfg)
+    def rate(until):
+        if rating_seconds and time.monotonic() < until:
+            measure_strength(cfg, model_identity(state['champion']),
+                             lambda: make_engine(host, state['champion']), until)
     def advance():
         state['stage'] += 1; save(cfg, state)
     try:
-        while time.monotonic() < deadline and state['stage'] < len(STAGES):
+        rate(min(training_deadline, time.monotonic() + rating_seconds))
+        while time.monotonic() < training_deadline and state['stage'] < len(STAGES):
             stage = STAGES[state['stage']]
-            remaining = deadline - time.monotonic()
+            remaining = training_deadline - time.monotonic()
             print(f"Full pipeline: cycle {state['cycle']}, stage {stage}, {remaining/60:.1f} minutes left", flush=True)
             if stage == 'dense':
                 dcfg = dense_config(cfg)
@@ -368,7 +379,7 @@ def run(host, cfg):
                     if labels is None:
                         state['sparse_status'] = 'Label download checkpointed; resume this stage'; save(cfg, state); break
                     trained = train_labels(labels, root/'sparse', epochs=cfg.get('pipeline_sparse_epochs', 100),
-                                 batch_size=256, hidden=64, deadline=deadline,
+                                 batch_size=256, hidden=64, deadline=training_deadline,
                                  progress=lambda row: print('Sparse training:', row, flush=True))
                     if trained['epochs'] < trained['target_epochs']:
                         save(cfg, state); return state
@@ -388,7 +399,7 @@ def run(host, cfg):
                     candidate = state['candidates'][0]
                     if model_identity(candidate) == model_identity(state['champion']):
                         state['candidates'].pop(0); save(cfg, state); continue
-                    if not challenge(host, cfg, state, candidate, candidate['kind'], deadline):
+                    if not challenge(host, cfg, state, candidate, candidate['kind'], training_deadline):
                         return state
                     state['candidates'].pop(0); save(cfg, state)
                 advance()
@@ -398,17 +409,20 @@ def run(host, cfg):
                     feature = features[state['search_index']]
                     candidate = copy.deepcopy(state['champion'])
                     candidate['options'][feature] = not candidate['options'][feature]
-                    if not challenge(host, cfg, state, candidate, 'search:' + feature, deadline):
+                    if not challenge(host, cfg, state, candidate, 'search:' + feature, training_deadline):
                         return state
                     state['search_index'] += 1; save(cfg, state)
                 advance()
             elif stage == 'diagnostics':
-                if not diagnostics(host, cfg, state, deadline):
+                if not diagnostics(host, cfg, state, training_deadline):
                     return state
                 state['cycle'] += 1; state['stage'] = 0; state['search_index'] = 0
                 save(cfg, state)
                 break  # One coordinated cycle per Run all; next session continues.
+        rate(min(deadline, time.monotonic() + rating_seconds))
     finally:
         save(cfg, state)
         publish(host, cfg, state)
+        prune_pipeline_exports(cfg)
+        print_usage(cfg['root'])
     return state

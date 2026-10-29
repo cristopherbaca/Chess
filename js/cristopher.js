@@ -1,5 +1,5 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG } from "./config.js";
+import { CONFIG, activeEngine, STOCKFISH_API_URL } from "./config.js?v=engine-ui-3";
 
 export class CristopherError extends Error {
   constructor(code, message) {
@@ -18,7 +18,10 @@ async function request(
   options = {},
   timeoutMs = CONFIG.REQUEST_TIMEOUT_MS,
   controller = new AbortController(),
+  engine = "cristopher",
 ) {
+  const stockfish = engine === "stockfish";
+  const name = stockfish ? "Cristopher V2" : "Cristopher";
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -26,13 +29,12 @@ async function request(
   }, timeoutMs);
   try {
     const response = await fetch(
-      `${CONFIG.API_URL.replace(/\/+$/, "")}${path}`,
+      stockfish ? STOCKFISH_API_URL : `${CONFIG.API_URL.replace(/\/+$/, "")}${path}`,
       {
         ...options,
         headers: {
           ...options.headers,
-          ...CONFIG.EXTRA_HEADERS,
-          "ngrok-skip-browser-warning": "true",
+          ...(!stockfish ? { ...CONFIG.EXTRA_HEADERS, "ngrok-skip-browser-warning": "true" } : {}),
         },
         signal: controller.signal,
         credentials: "omit",
@@ -48,7 +50,7 @@ async function request(
           : response.status === 503
             ? "The AI is busy. Please wait a moment and retry."
             : response.status === 403
-              ? "This website is not allowed by the API. Check WEBSITE_ORIGINS in deployment."
+              ? (stockfish ? "The Cristopher V2 service refused this request. Please try again later." : "This website is not allowed by the API. Check WEBSITE_ORIGINS in deployment.")
               : `The AI server returned HTTP ${response.status}. Please try again.`,
       );
     return await response.json();
@@ -57,18 +59,18 @@ async function request(
       throw new CristopherError(
         timedOut ? "timeout" : "cancelled",
         timedOut
-          ? "Cristopher took too long to respond. Please try again."
+          ? `${name} took too long to respond. Please try again.`
           : "Move request cancelled. Retry when you’re ready.",
       );
     if (error instanceof CristopherError) throw error;
     if (error instanceof SyntaxError)
       throw new CristopherError(
         "json",
-        "Cristopher sent an unreadable response. Please try again.",
+        `${name} sent an unreadable response. Please try again.`,
       );
     throw new CristopherError(
       "network",
-      "We couldn't reach Cristopher. Check the connection and try again.",
+      `We couldn't reach ${name}. Check the connection and try again.`,
     );
   } finally {
     clearTimeout(timeout);
@@ -76,6 +78,7 @@ async function request(
 }
 
 export async function getCristopherMove({ fen, history, difficulty }) {
+  const engine = activeEngine();
   const game = new Chess(fen);
   const legalMoves = game.moves({ verbose: true });
   if (game.isGameOver() || !legalMoves.length)
@@ -87,7 +90,7 @@ export async function getCristopherMove({ fen, history, difficulty }) {
     const move = legalMoves[Math.floor(Math.random() * legalMoves.length)];
     return `${move.from}${move.to}${move.promotion || ""}`;
   };
-  if (!CONFIG.USE_API) {
+  if (engine === "random") {
     await new Promise((resolve) =>
       setTimeout(resolve, 400 + Math.random() * 400),
     );
@@ -101,12 +104,15 @@ export async function getCristopherMove({ fen, history, difficulty }) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fen, history, difficulty }),
+        body: JSON.stringify(engine === "stockfish"
+          ? { fen, variants: 1, depth: ({ easy: 8, medium: 12, hard: 18 })[difficulty] || 12, maxThinkingTime: 100 }
+          : { fen, history, difficulty }),
       },
       difficulty === "hard"
         ? CONFIG.HARD_REQUEST_TIMEOUT_MS
         : CONFIG.REQUEST_TIMEOUT_MS,
       controller,
+      engine,
     );
     if (
       typeof result?.move !== "string" ||
@@ -118,9 +124,14 @@ export async function getCristopherMove({ fen, history, difficulty }) {
     )
       throw new CristopherError(
         "illegal",
-        "Cristopher returned an invalid move. Your board is safe. Please try again.",
+        `${engine === "stockfish" ? "Cristopher V2" : "Cristopher"} returned an invalid move. Your board is safe. Please try again.`,
       );
-    return { move: result.move, info: result.info };
+    return { move: result.move, info: engine === "stockfish" ? {
+      engine: "Cristopher V2",
+      eval: Number.isFinite(result.eval) ? result.eval : undefined,
+      depth: Number.isFinite(result.depth) ? result.depth : undefined,
+      time_ms: Number.isFinite(result.time) ? result.time : undefined,
+    } : result.info };
   } catch (error) {
     if (CONFIG.AUTO_FALLBACK && error.code !== "cancelled")
       return {

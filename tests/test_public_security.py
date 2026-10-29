@@ -204,7 +204,7 @@ class FreshTrainingAndSiteTests(unittest.TestCase):
             self.assertFalse(any(p.endswith(('.ipynb', '.py', '.pt', '.npz')) for p in files))
             self.assertNotIn('.env', files)
             html = (output / 'index.html').read_text()
-            self.assertIn("connect-src 'self' https://api.example.com;", html)
+            self.assertIn("connect-src 'self' https://api.example.com https://chess-api.com;", html)
             self.assertNotIn("'unsafe-inline'", html)
             self.assertIn('https://api.example.com', (output / 'js/public-config.js').read_text())
             self.assertEqual(build(root, 'https://api.example.com'), output)

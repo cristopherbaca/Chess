@@ -1,17 +1,18 @@
 import { Chess } from "../vendor/chess.js";
-import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js";
+import { CONFIG, normalizeApiUrl, hasMixedContent } from "../js/config.js?v=engine-ui-3";
 import {
   getCristopherMove,
   checkCristopherHealth,
   checkHealth,
   cancelCristopherMove,
   CristopherError,
-} from "../js/cristopher.js";
+} from "../js/cristopher.js?v=engine-ui-3";
 import { gameStatus, materialSummary, toUci, undoTurn } from "../js/game.js";
 import { ChessClock, formatTime } from "../js/ui/clock.js";
 
 const suiteConfig = { ...CONFIG };
 Object.assign(CONFIG, {
+  ENGINE: "cristopher",
   USE_API: false,
   API_URL: "http://localhost:8000",
   AUTO_FALLBACK: false,
@@ -284,6 +285,50 @@ await test("Health identity, error results, URL normalization, and mixed content
   assert(!hasMixedContent("http://localhost:8000", "https:"));
   assert(!hasMixedContent("https://example.com", "https:"));
 });
+await test("Stockfish uses the free endpoint without model headers and validates its moves", async () => {
+  const saved = { ...CONFIG };
+  try {
+    CONFIG.ENGINE = "stockfish";
+    CONFIG.USE_API = false;
+    CONFIG.AUTO_FALLBACK = false;
+    CONFIG.EXTRA_HEADERS = { Authorization: "private-model-key" };
+    for (const [difficulty, depth] of [["easy", 8], ["medium", 12], ["hard", 18]]) {
+      globalThis.fetch = async (url, options) => {
+        assert(url === "https://chess-api.com/v1");
+        const body = JSON.parse(options.body);
+        assert(body.fen === input.fen && body.depth === depth && body.variants === 1);
+        assert(!("history" in body));
+        assert(Object.keys(options.headers).join() === "Content-Type", "Model headers must not leak to Stockfish");
+        assert(options.credentials === "omit");
+        return new Response(JSON.stringify({ move: "e2e4", eval: -0.2, depth }));
+      };
+      const result = await getCristopherMove({ ...input, difficulty });
+      assert(result.move === "e2e4" && result.info.eval === -0.2 && result.info.depth === depth);
+    }
+    globalThis.fetch = async () => new Response(JSON.stringify({ move: "e2e5" }));
+    await rejects(() => getCristopherMove(input), "Cristopher V2 returned an invalid move");
+    globalThis.fetch = async () => new Response(JSON.stringify({ move: "a7a8q" }));
+    assert((await getCristopherMove({ ...input, fen: "7k/P7/8/8/8/8/8/7K w - - 0 1" })).move === "a7a8q");
+    globalThis.fetch = async () => new Response("", { status: 429 });
+    await rejects(() => getCristopherMove(input), "Too many requests");
+    globalThis.fetch = async () => new Response("{");
+    await rejects(() => getCristopherMove(input), "Cristopher V2 sent an unreadable response");
+    globalThis.fetch = (_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    });
+    CONFIG.REQUEST_TIMEOUT_MS = 10;
+    await rejects(() => getCristopherMove(input), "Cristopher V2 took too long");
+    const pending = getCristopherMove(input);
+    cancelCristopherMove();
+    await rejects(() => pending, "cancelled");
+    CONFIG.ENGINE = "random";
+    CONFIG.USE_API = true;
+    globalThis.fetch = () => { throw new Error("Random engine must not fetch"); };
+    assert((await getCristopherMove(input)).info.placeholder);
+  } finally {
+    Object.assign(CONFIG, saved);
+  }
+});
 Object.assign(CONFIG, originalConfig);
 globalThis.fetch = originalFetch;
 
@@ -317,6 +362,7 @@ await test("Public CSP blocks eval and inline scripts", async () => {
 });
 const frameOriginalConfig = { ...frameConfig };
 Object.assign(frameConfig, {
+  ENGINE: "cristopher",
   USE_API: false,
   API_URL: "http://localhost:8000",
   AUTO_FALLBACK: false,
@@ -898,6 +944,78 @@ await test("Local games stop API checks; confirmed connection stays visible duri
     frameConfig.USE_API = false;
     newGame("local");
     w.fetch = savedFetch;
+  }
+});
+await test("Engine selector persists, routes Stockfish, and cancels stale moves without local-game requests", async () => {
+  const w = frame.contentWindow, savedFetch = w.fetch, saved = { ...frameConfig };
+  const stored = new Map(Array.from({ length: w.localStorage.length }, (_, i) => {
+    const key = w.localStorage.key(i); return [key, w.localStorage.getItem(key)];
+  }));
+  const select = (value) => {
+    doc.getElementById("ai-engine").value = value;
+    doc.getElementById("ai-engine").dispatchEvent(new w.Event("change"));
+  };
+  let calls = 0;
+  try {
+    newGame("local");
+    w.fetch = async (url) => {
+      calls++;
+      assert(url === "https://chess-api.com/v1");
+      return new Response(JSON.stringify({ move: "e7e5", eval: 0.1, depth: 12 }));
+    };
+    // A selection must survive an unrelated render before the native change
+    // event, then activate on input even if change is delayed until blur.
+    const engineSelect = doc.getElementById("ai-engine");
+    engineSelect.value = "stockfish";
+    click("engine-info-toggle");
+    assert(engineSelect.value === "stockfish", "Rendering must not reset the user's pending selection");
+    engineSelect.dispatchEvent(new w.Event("input"));
+    assert(frameConfig.ENGINE === "stockfish", "Input must activate the selected engine immediately");
+    click("engine-info-toggle");
+    engineSelect.dispatchEvent(new w.Event("change"));
+    assert(w.localStorage.getItem("chess.engine") === "stockfish");
+    assert(doc.getElementById("cristopher-settings").hidden);
+    assert(!doc.getElementById("stockfish-help").hidden);
+    doc.dispatchEvent(new w.Event("visibilitychange"));
+    await sleep(30);
+    assert(calls === 0 && doc.getElementById("connection").textContent.includes("API inactive"));
+    newGame("ai");
+    assert(calls === 0 && doc.getElementById("connection").textContent.includes("ready to connect"));
+    move("e2", "e4");
+    await until(() => doc.getElementById("move-count").textContent === "2 played", "Stockfish move");
+    assert(calls === 1 && doc.getElementById("connection").textContent.includes("Connected"));
+    assert(doc.getElementById("api-health-detail").textContent.includes("Cristopher V2 · Depth 12"));
+    click("undo-button");
+    w.fetch = async () => new Response("", { status: 429 });
+    move("e2", "e4");
+    await until(() => !doc.getElementById("ai-error").hidden, "Stockfish rejection");
+    assert(doc.getElementById("connection").textContent.includes("Disconnected"));
+    click("undo-button");
+    let resolveMove, moveSignal;
+    w.fetch = (_url, { signal }) => {
+      moveSignal = signal;
+      return new Promise(resolve => { resolveMove = resolve; });
+    };
+    move("e2", "e4");
+    await until(() => Boolean(resolveMove), "pending Stockfish request");
+    select("random");
+    assert(moveSignal.aborted, "Switching engines must abort the previous request");
+    resolveMove(new Response(JSON.stringify({ move: "e7e5" })));
+    await sleep(30);
+    assert(doc.getElementById("move-count").textContent === "1 played", "Stale reply must not move pieces");
+    w.fetch = () => { throw new Error("Random engine must not fetch"); };
+    click("retry-button");
+    await until(() => doc.getElementById("move-count").textContent === "2 played", "random retry");
+    newGame("local");
+    select("cristopher");
+    assert(!doc.getElementById("cristopher-settings").hidden && frameConfig.USE_API);
+    assert(frameConfig.API_URL === saved.API_URL, "Switching engines must preserve the model URL");
+  } finally {
+    Object.assign(frameConfig, saved);
+    newGame("local");
+    w.fetch = savedFetch;
+    for (const key of Object.keys(w.localStorage)) if (key.startsWith("chess.")) w.localStorage.removeItem(key);
+    for (const [key, value] of stored) w.localStorage.setItem(key, value);
   }
 });
 Object.assign(CONFIG, suiteConfig);

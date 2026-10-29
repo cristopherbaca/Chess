@@ -1,4 +1,4 @@
-import { PUBLIC_API_URL } from "./public-config.js";
+import { PUBLIC_API_URL } from "./public-config.js?v=engine-ui-3";
 
 const saved = (key, fallback) => {
   try {
@@ -34,6 +34,9 @@ try {
   /* Ignore invalid saved URLs. */
 }
 export const CONFIG = {
+  ENGINE: ["random", "cristopher", "stockfish"].includes(saved("chess.engine", ""))
+    ? saved("chess.engine", "")
+    : "cristopher",
   USE_API: saved("chess.useApi", PUBLIC_API_URL ? "true" : "false") === "true",
   API_URL: apiUrl,
   REQUEST_TIMEOUT_MS: 15000,
@@ -46,9 +49,12 @@ export const CONFIG = {
 
 export function saveApiSettings(values) {
   const next = { ...values };
+  if ("ENGINE" in next && !["random", "cristopher", "stockfish"].includes(next.ENGINE))
+    throw new Error("Choose a supported AI engine.");
   if ("API_URL" in next) next.API_URL = normalizeApiUrl(next.API_URL);
   Object.assign(CONFIG, next);
   for (const [name, key] of Object.entries({
+    ENGINE: "engine",
     API_URL: "apiUrl",
     USE_API: "useApi",
     AUTO_FALLBACK: "autoFallback",
@@ -61,6 +67,12 @@ export function saveApiSettings(values) {
     }
   }
 }
+
+export const activeEngine = () => CONFIG.ENGINE === "cristopher" && !CONFIG.USE_API
+  ? "random" : CONFIG.ENGINE;
+export const usesRemoteEngine = () => activeEngine() !== "random";
+export const engineName = () => ({ random: "Random bot", cristopher: "Cristopher", stockfish: "Cristopher V2" })[activeEngine()];
+export const STOCKFISH_API_URL = "https://chess-api.com/v1";
 
 export function hasMixedContent(
   url = CONFIG.API_URL,

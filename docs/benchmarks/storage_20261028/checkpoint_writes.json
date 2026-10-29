@@ -1,0 +1,12 @@
+{
+  "parameters": 30017409,
+  "progress_saves": 80,
+  "legacy_bytes_per_checkpoint": 360211133,
+  "legacy_estimated_bytes_for_80_saves": 28816890640,
+  "new_total_checkpoint_bytes_written": 120223289,
+  "new_weight_blob_writes": 1,
+  "new_active_bytes": 120076912,
+  "elapsed_seconds": 11.519,
+  "precision": "float32, lossless",
+  "note": "Synthetic unchanged 30M tensors and small progress state; not a measurement of the user Drive. Exports/logs/Trash are outside this comparison."
+}

@@ -616,6 +616,7 @@ dialog p {
 .api-settings {
   margin-top: 20px;
 }
+#ai-engine,
 #api-url {
   width: 100%;
   min-width: 0;

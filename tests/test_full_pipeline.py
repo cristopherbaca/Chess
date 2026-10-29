@@ -76,14 +76,14 @@ assert chess.Move.from_uci(a['move']) in chess.Board().legal_moves
         self.host.gpu_save(original_cfg, original)
         folder = self.root / 'checkpoints/old_dense'
         (folder / 'gpu_99999999.pt').write_bytes(b'interrupted latest checkpoint')
-        before = {p.name: p.read_bytes() for p in folder.iterdir()}
+        before = {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob('*') if p.is_file()}
         self.cfg['pipeline_source_run'] = 'old_dense'
         state = self.pipeline.load(self.host, self.cfg, create=True)
         self.assertEqual(state['origin']['generation'], 22)
         imported = self.host.gpu_load(self.pipeline.dense_config(self.cfg))
         self.assertTrue(torch.equal(imported['champion'], original['champion']))
         self.assertTrue(torch.equal(imported['mean'], original['mean']))
-        self.assertEqual(before, {p.name: p.read_bytes() for p in folder.iterdir()})
+        self.assertEqual(before, {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob('*') if p.is_file()})
         self.assertEqual(imported['jobs'], [])
 
     def test_missing_source_never_silently_starts_from_scratch(self):
@@ -91,6 +91,18 @@ assert chess.Move.from_uci(a['move']) in chess.Board().legal_moves
         with self.assertRaisesRegex(FileNotFoundError, 'SOURCE_RUN'):
             self.pipeline.load(self.host, self.cfg, create=True)
         self.assertFalse((self.root / 'models/latest_champion.json').exists())
+
+    def test_rating_runs_in_the_pipeline_and_keeps_champion_selection_independent(self):
+        self.cfg.update(rating_enabled=True, rating_minutes=.001, rating_move_seconds=.001, rating_nodes=1,
+                        rating_pairs=10)
+        state = self.pipeline.run(self.host, self.cfg)
+        latest = self.pipeline.workspace(self.cfg) / 'ratings/latest.json'
+        report = json.loads(latest.read_text())
+        self.assertEqual(report['identity']['candidate'], self.pipeline.model_identity(state['champion']))
+        self.assertEqual(report['identity']['reference']['kind'], 'fixed-classical-baseline')
+        self.assertFalse(state['verified'])
+        self.assertEqual(state['champion']['kind'], 'dense')
+        self.assertEqual(state['cycle'], 1)
 
     def test_widen_import_preserves_predictions_recovery_and_deployment(self):
         original_cfg = {**self.cfg, 'run_name': 'old_dense', 'training_mode': 'gpu_neuroevolution'}
@@ -104,7 +116,7 @@ assert chess.Move.from_uci(a['move']) in chess.Board().legal_moves
         self.host.gpu_save(original_cfg, original)
         original_snapshot = self.pipeline.dense_snapshot(original_cfg)
         folder = self.root / 'checkpoints/old_dense'
-        before = {p.name: p.read_bytes() for p in folder.iterdir()}
+        before = {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob('*') if p.is_file()}
         self.cfg.update(gpu_hidden=[13, 9], gpu_population=4, pipeline_source_run='old_dense')
         state = self.pipeline.load(self.host, self.cfg, create=True)
         cfg = self.pipeline.dense_config(self.cfg)
@@ -114,7 +126,7 @@ assert chess.Move.from_uci(a['move']) in chess.Board().legal_moves
         self.assertEqual(imported['generation'], 22)
         self.assertEqual(len(imported['seeds']), 2)
         self.assertFalse(imported['champion_verified'])
-        self.assertEqual(before, {p.name: p.read_bytes() for p in folder.iterdir()})
+        self.assertEqual(before, {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob('*') if p.is_file()})
 
         def predict(vector, config, x):
             layout, _ = self.host.gpu_layout(config)
@@ -146,7 +158,7 @@ assert chess.Move.from_uci(a['move']) in chess.Board().legal_moves
 
     def test_search_based_dense_evolution_uses_real_search_and_resumes(self):
         cfg = {**self.cfg, 'training_mode': 'gpu_neuroevolution', 'run_name': 'search_dense',
-               'gpu_generations': 1, 'gpu_train_with_search': True, 'gpu_training_seconds': .01,
+               'gpu_generations': 1, 'gpu_train_with_search': True, 'gpu_trace_search': True, 'gpu_training_seconds': .01,
                'gpu_training_nodes': 64, 'gpu_training_depth': 2, 'gpu_max_plies': 10,
                'max_hours': .02}
         state = self.host.gpu_evolve(cfg)

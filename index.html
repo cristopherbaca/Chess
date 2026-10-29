@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/board.css" />
-    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/components.css?v=engine-ui-3" />
   </head>
   <body>
     <svg
@@ -497,47 +497,56 @@
         /></label>
       </div>
       <fieldset class="api-settings">
-        <legend>Connect to Cristopher</legend>
-        <div class="settings-toggles">
-          <label>Use AI server <input id="use-api" type="checkbox" role="switch" /></label>
-        </div>
-        <p class="form-note">The server is used only for AI games while this switch is on. Switch it off to play the offline random bot. Local two-player games never use the API automatically.</p>
-        <label class="field-label" for="api-url">Server URL</label>
-        <input
-          id="api-url"
-          type="url"
-          placeholder="https://your-tunnel.trycloudflare.com"
-          spellcheck="false"
-          autocomplete="off"
-        />
-        <div class="api-actions">
-          <button id="paste-api-url" class="text-button" type="button">
-            Paste
-          </button>
-          <button id="test-api" class="text-button" type="button">
-            Test connection
-          </button>
+        <legend>AI engine</legend>
+        <label class="field-label" for="ai-engine">Engine</label>
+        <select id="ai-engine">
+          <option value="random">Random moves (offline)</option>
+          <option value="cristopher">My model — Cristopher</option>
+          <option value="stockfish">Cristopher V2 (≈2350 Elo, estimated)</option>
+        </select>
+        <p id="stockfish-help" class="form-note" hidden>Cristopher V2 plays online. Medium and Hard show approximate Elo estimates, not measured ratings. Easy is unrated. Your board position is sent to an external engine service when it plays; no Colab runtime or key is needed.</p>
+        <div id="cristopher-settings">
+          <div class="settings-toggles">
+            <label>Use AI server <input id="use-api" type="checkbox" role="switch" /></label>
+          </div>
+          <p class="form-note">The server is used only for AI games while this switch is on. Switch it off to play the offline random bot. Local two-player games never use the API automatically.</p>
+          <label class="field-label" for="api-url">Server URL</label>
+          <input
+            id="api-url"
+            type="url"
+            placeholder="https://your-tunnel.trycloudflare.com"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <div class="api-actions">
+            <button id="paste-api-url" class="text-button" type="button">
+              Paste
+            </button>
+            <button id="test-api" class="text-button" type="button">
+              Test connection
+            </button>
+          </div>
+          <p id="mixed-content-warning" class="error-message" role="alert" hidden>
+            This HTTPS page cannot reach an HTTP server. The browser will block
+            it; use an HTTPS tunnel URL.
+          </p>
+          <details class="api-help">
+            <summary>How to start the API</summary>
+            <ol>
+              <li>First, open <code>vendor/train.ipynb</code> in a GPU Colab runtime and choose Run all. It trains and saves the champion to Drive automatically.</li>
+              <li>Open <code>vendor/deploy.ipynb</code> in another Colab runtime and choose Run all. It only deploys the saved model and finishes with a verified HTTPS URL.</li>
+              <li>Paste that URL here, enable Use AI server, and press Test connection.</li>
+              <li>Keep the deployment runtime connected while playing. Run all again and paste the new URL when restarting deployment.</li>
+            </ol>
+            <p>
+              The web page cannot start Colab. The offline bot plays random legal
+              moves without any API. A localhost server runs on your computer, not
+              in Colab.
+            </p>
+          </details>
         </div>
         <p id="api-status" class="api-status" role="status"></p>
         <p id="api-health-detail" class="form-note" role="status"></p>
-        <p id="mixed-content-warning" class="error-message" role="alert" hidden>
-          This HTTPS page cannot reach an HTTP server. The browser will block
-          it; use an HTTPS tunnel URL.
-        </p>
-        <details class="api-help">
-          <summary>How to start the API</summary>
-          <ol>
-            <li>First, open <code>vendor/train.ipynb</code> in a GPU Colab runtime and choose Run all. It trains and saves the champion to Drive automatically.</li>
-            <li>Open <code>vendor/deploy.ipynb</code> in another Colab runtime and choose Run all. It only deploys the saved model and finishes with a verified HTTPS URL.</li>
-            <li>Paste that URL here, enable Use AI server, and press Test connection.</li>
-            <li>Keep the deployment runtime connected while playing. Run all again and paste the new URL when restarting deployment.</li>
-          </ol>
-          <p>
-            The web page cannot start Colab. The offline bot plays random legal
-            moves without any API. A localhost server runs on your computer, not
-            in Colab.
-          </p>
-        </details>
         <div class="settings-toggles">
           <label
             >If the API fails, use the local fallback bot
@@ -592,6 +601,6 @@
       ><p class="startup-message">Enable JavaScript to play chess.</p></noscript
     >
     <script src="js/startup.js" defer></script>
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=engine-ui-3"></script>
   </body>
 </html>

@@ -203,9 +203,10 @@ def search_training_games(host, cfg, state, bank, deadline, save):
                                nodes=cfg.get('gpu_training_nodes', 10000), depth=cfg.get('gpu_training_depth', 64))
                     move = result.move
                     state['positions'] += bank.positions - before
-                    with trace.open('a') as handle:
-                        handle.write(json.dumps({'ply': board.ply(), 'fen': board.fen(), 'move': move.uci(),
-                                                 'score_stm': result.score, 'depth': result.depth, 'stats': result.stats})+'\n')
+                    if cfg.get('gpu_trace_search', False):
+                        with trace.open('a') as handle:
+                            handle.write(json.dumps({'ply': board.ply(), 'fen': board.fen(), 'move': move.uci(),
+                                                     'score_stm': result.score, 'depth': result.depth, 'stats': result.stats})+'\n')
                 elif model == -2:
                     if external is None:
                         external = chess.engine.SimpleEngine.popen_uci(cfg['stockfish'], timeout=10)

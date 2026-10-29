@@ -40,7 +40,7 @@ def fixture(folder):
     cfg.update(root=str(folder), run_name='persistence_test', workers=1, gpu_hidden=[8, 4],
                gpu_population=2, gpu_pairs_per_opponent=1, gpu_max_plies=12,
                gpu_parallel_games=16, gpu_batch_rows=128, gpu_require_cuda=False,
-               gpu_native_prepare=False, gpu_native_path='', gpu_anchor_enabled=False,
+               gpu_native_prepare=False, gpu_native_path='', gpu_anchor_enabled=False, rating_enabled=False,
                gpu_generations=1, gpu_checkpoint_seconds=.001, max_hours=.01)
     path = folder / 'models' / 'test_gpu_worker.py'
     path.parent.mkdir(parents=True, exist_ok=True)

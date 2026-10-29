@@ -12,7 +12,7 @@ from pathlib import Path
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ('board', 'evaluation', 'search', 'neural', 'inference', 'runtime', 'matches', 'training', 'notebook_bridge',
+MODULES = ('board', 'evaluation', 'search', 'neural', 'inference', 'storage', 'runtime', 'matches', 'strength', 'training', 'notebook_bridge',
            'datasets', 'validation_cases', 'full_pipeline')
 BEGIN = '# BEGIN GENERATED CHESS ENGINE BUNDLE\n'
 END = '# END GENERATED CHESS ENGINE BUNDLE\n'

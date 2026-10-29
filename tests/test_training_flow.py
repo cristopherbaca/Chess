@@ -22,7 +22,7 @@ class TrainingFlowTests(unittest.TestCase):
                 exec(compile(source(TRAIN, 'train-config'), 'train-config', 'exec'), scope)
                 cfg = scope['CFG']
                 cfg.update(root=directory, training_mode=mode, run_name='flow_test', workers=1,
-                           QUICK_TEST=True, cpp_backend=False, generations=1, gpu_generations=1,
+                           QUICK_TEST=True, rating_enabled=False, cpp_backend=False, generations=1, gpu_generations=1,
                            gpu_hidden=[8, 4], gpu_population=2, gpu_require_cuda=False,
                            gpu_native_prepare=False, gpu_anchor_enabled=False, gpu_max_plies=8,
                            gpu_pairs_per_opponent=1, gpu_parallel_games=16, gpu_batch_rows=128,
