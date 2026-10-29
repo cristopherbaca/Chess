@@ -53,7 +53,7 @@ def implementation_id():
     package = sys.modules[__package__]
     if hasattr(package, 'source_sha256'):
         return package.source_sha256
-    names = ('board', 'evaluation', 'search', 'neural', 'runtime', 'matches', 'training', 'notebook_bridge',
+    names = ('board', 'evaluation', 'search', 'neural', 'inference', 'runtime', 'matches', 'training', 'notebook_bridge',
              'datasets', 'validation_cases', 'full_pipeline')
     sources = {name: Path(__file__).with_name(name + '.py').read_text() for name in names}
     return hashlib.sha256(json.dumps(sources, sort_keys=True).encode()).hexdigest()

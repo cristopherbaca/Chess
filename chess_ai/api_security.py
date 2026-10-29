@@ -15,6 +15,8 @@ from starlette.responses import JSONResponse
 
 
 def allowed_origins(value):
+    if value.strip() == '*':
+        return ('*',)
     origins = []
     for item in value.split(','):
         item = item.strip().rstrip('/')
@@ -25,7 +27,7 @@ def allowed_origins(value):
         if (url.scheme not in (('http', 'https') if local else ('https',)) or not url.hostname
                 or url.username or url.password or url.query or url.fragment or url.path
                 or '*' in item):
-            raise ValueError('Use exact HTTPS website origins without paths or wildcards (localhost HTTP is allowed).')
+            raise ValueError('Use * alone for any origin, or exact HTTPS origins without paths (localhost HTTP is allowed).')
         origins.append(item)
     if not origins:
         raise ValueError('At least one website origin is required.')
@@ -125,10 +127,12 @@ class SecurityBoundary:
             await send(message)
         async def reject(status, text, extra=None):
             response_headers = dict(extra or {})
-            if origin in policy.origins:
+            if origin and '*' in policy.origins:
+                response_headers['Access-Control-Allow-Origin'] = '*'
+            elif origin in policy.origins:
                 response_headers.update({'Access-Control-Allow-Origin': origin, 'Vary': 'Origin'})
             await JSONResponse({'error': text}, status_code=status, headers=response_headers)(scope, receive, secure_send)
-        if origin and origin not in policy.origins:
+        if origin and '*' not in policy.origins and origin not in policy.origins:
             with policy.lock:
                 policy.counts['blocked_origin'] += 1
             return await reject(403, 'This website origin is not allowed.')

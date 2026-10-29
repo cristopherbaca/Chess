@@ -3,6 +3,7 @@ Run: python -m unittest discover -s tests -p 'test_notebooks.py' -v
 Requires the API test dependencies plus torch and nbformat.
 """
 import ast
+from itertools import count
 import contextlib
 import copy
 import importlib.util
@@ -12,7 +13,9 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import types
 from unittest.mock import patch
+import requests
 
 import chess
 import nbformat
@@ -82,9 +85,28 @@ class NotebookTests(unittest.TestCase):
         self.assertNotIn('FastAPI(', '\n'.join(''.join(c['source']) for c in TRAIN['cells']))
         self.assertNotIn('gpu_evolve(', '\n'.join(''.join(c['source']) for c in DEPLOY['cells']))
         self.assertEqual(DEPLOY['cells'][-1]['id'], 'phase3-tunnel')
-        self.assertNotIn('while True:', source(DEPLOY, 'phase3-tunnel'))
         self.assertIn('def shutdown_api():', source(DEPLOY, 'phase3-server'))
         self.assertNotIn('\nshutdown_api()', source(DEPLOY, 'phase3-server'))
+
+    def test_public_connection_retries_beyond_eleven_and_can_be_interrupted(self):
+        tree = ast.parse(source(DEPLOY, 'phase3-tunnel'))
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'wait_for_public_api')
+        calls, sleeps = [], []
+        def self_test(url, public):
+            calls.append((url, public))
+            if len(calls) < 14:
+                raise requests.ConnectionError('not ready')
+        namespace = {'count': count, 'requests': requests, 'api_self_test': self_test,
+                     'time': types.SimpleNamespace(sleep=sleeps.append)}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), '<retry-test>', 'exec'), namespace)
+        namespace['wait_for_public_api']('https://test.example')
+        self.assertEqual(len(calls), 14)
+        self.assertEqual(sleeps, [3]*13)
+        def interrupt(*args, **kwargs):
+            raise KeyboardInterrupt()
+        namespace['api_self_test'] = interrupt
+        with self.assertRaises(KeyboardInterrupt):
+            namespace['wait_for_public_api']('https://test.example')
 
     def test_initial_champion_and_changed_champion_load_without_training(self):
         first = self.bundle()

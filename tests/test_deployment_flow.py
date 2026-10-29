@@ -23,10 +23,22 @@ class DeploymentRunAllTest(unittest.TestCase):
     def test_full_pipeline_run_all_loads_selected_engine_and_returns_url(self):
         self.run_flow(full_pipeline=True)
 
-    def run_flow(self, full_pipeline=False):
+    def test_previously_exported_population_guard_is_bypassed_without_rewriting_weights(self):
+        self.run_flow(full_pipeline=True, legacy_memory_guard=True)
+
+    def run_flow(self, full_pipeline=False, legacy_memory_guard=False):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             cfg, worker = fixture(root)
+            if legacy_memory_guard:
+                # Simulate the old export failing its population budget on a
+                # crowded GPU. The loader must repair inference in memory only.
+                path = Path(worker.__file__)
+                code = path.read_text().replace(
+                    'GpuPopulation = _CHESS_ENGINE_PACKAGE.inference.population_class(GpuPopulation, gpu_layout)', '')
+                code = code.replace('self.torch=torch; self.cfg=cfg',
+                    "self.torch=torch; self.cfg=cfg\n        if cfg.get('gpu_inference_only'): raise RuntimeError('GPU model population does not fit with the requested headroom.')")
+                path.write_text(code)
             if full_pipeline:
                 cfg.update(training_mode='full_pipeline', run_name='full_test', pipeline_source_run='')
                 pipeline = worker._CHESS_ENGINE_PACKAGE.full_pipeline
@@ -34,6 +46,8 @@ class DeploymentRunAllTest(unittest.TestCase):
                 pipeline.publish(worker, cfg, state)
             else:
                 worker.gpu_load(cfg, create=True)  # A complete baseline snapshot without a training run.
+            saved_artifacts = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+                               for p in (root / 'models').rglob('*') if p.is_file()}
             mounted = []
             google = types.ModuleType('google')
             colab = types.ModuleType('google.colab')
@@ -83,6 +97,8 @@ class DeploymentRunAllTest(unittest.TestCase):
                             exec(compile(code, cell['id'], 'exec'), scope)
                         self.assertEqual(scope['PUBLIC_URL'], fake_url)
                         self.assertTrue(scope['API_SERVER_THREAD'].is_alive())
+                        self.assertEqual(scope['API_SERVER'].config.host, '127.0.0.1')
+                        self.assertFalse(scope['API_SERVER'].config.proxy_headers)
                         self.assertIsNone(children[-1].poll())
                         self.assertEqual(real_get('http://127.0.0.1:8000/health', timeout=4).status_code, 200)
                         self.assertTrue(output.getvalue().rstrip().endswith(fake_url))
@@ -100,6 +116,8 @@ class DeploymentRunAllTest(unittest.TestCase):
                     if child.poll() is None:
                         child.terminate(); child.wait(timeout=5)
             self.assertTrue(mounted)
+            self.assertEqual(saved_artifacts, {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in (root / 'models').rglob('*') if p.is_file()})
             print('PASS: all deployment cells, local self-tests, simulated public checks, URL output, rerun and shutdown')
 
 if __name__ == '__main__':

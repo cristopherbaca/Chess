@@ -23,13 +23,17 @@ The complete workflow runs search-based neural evolution, classical genetic para
 ## Deploy the API
 
 1. Upload the latest [vendor/deploy.ipynb](vendor/deploy.ipynb) to a separate Colab runtime.
-2. Leave `WEBSITE_ORIGINS` set to `https://cristopherbaca.github.io` plus the supplied localhost origins, or change it for your actual website. Origins exclude repository paths such as `/Chess/`.
+2. Leave `WEBSITE_ORIGINS = '*'` to accept requests from any website. An exact comma-separated origin list is optional if you later want restrictions.
 3. Choose **Run all**. It loads only the new `MyDrive/chess_30m/models/` champion, verifies its manifest, starts the API, tests it and returns the HTTPS URL. It does not train.
 4. Paste the URL into the game's **Settings → Server URL**, enable **Use AI server**, and select an AI opponent. The API is used only when AI is selected and the toggle is enabled.
 
+Public connection checks retry every three seconds without an attempt limit until they pass. Interrupt the Colab cell to stop retries and close the tunnel.
+
 Keep the runtime connected; call `shutdown_api()` or disconnect to stop it. Rerun deployment to load a newly selected champion. A restarted temporary tunnel can have a different URL.
 
-The API has bounded request bodies, strict input validation, per-client and global rate limits, two admitted searches, search deadlines, restricted browser origins, private diagnostics and response security headers. It binds to loopback behind the tunnel, disables interactive API documentation and checks a pinned Cloudflare binary checksum. Public `/move` remains anonymous; no shared admin secret is embedded in the frontend. Read [PUBLIC_DEPLOYMENT.md](docs/PUBLIC_DEPLOYMENT.md) for exact limits and remaining risks.
+Deployment's `API_DEVICE` setting defaults to `auto`: one neural network loads on CUDA when available, with CPU fallback if GPU memory runs out. Set it to `cpu` to force CPU inference. The updated deployment notebook also fixes older exports that fail with “GPU model population does not fit with the requested headroom”; no retraining or model-size change is needed. See the [recovery instructions](docs/PUBLIC_DEPLOYMENT.md#gpu-populationheadroom-error-while-loading-a-champion).
+
+The API has bounded request bodies, strict input validation, per-client and global rate limits, two admitted searches, search deadlines, configurable browser origins, private diagnostics and response security headers. It binds to loopback behind the tunnel, disables interactive API documentation and checks a pinned Cloudflare binary checksum. Public `/move` remains anonymous; no shared admin secret is embedded in the frontend. Read [PUBLIC_DEPLOYMENT.md](docs/PUBLIC_DEPLOYMENT.md) for exact limits and remaining risks.
 
 ## Publish on GitHub Pages
 
@@ -92,4 +96,4 @@ python -m chess_ai  # Optional local UCI interface.
 
 `tools/sync_engine.py` embeds the canonical engine modules in the training notebook and the API security module in deployment. Run it after modifying those sources. Local tests establish correctness and integration, not an Elo gain or sustained Colab CUDA performance. Genuine strength claims require controlled matches with the newly trained champion.
 
-Latest local verification: **92 Python tests passed** ([output](docs/benchmarks/fresh_public_20261028/tests.txt)) and **32/32 browser checks passed** ([results](docs/benchmarks/fresh_public_20261028/browser.json)), including real browser enforcement of the script policy. Notebook synchronization also passes. Colab CUDA, the live public tunnel and GitHub Pages publication remain to be exercised in your accounts.
+Latest local verification: **100 Python tests passed** ([output](docs/benchmarks/inference_20261028/connection_tests.txt)) and **32/32 browser checks passed** ([results](docs/benchmarks/fresh_public_20261028/browser.json)), including real browser enforcement of the script policy. Notebook synchronization also passes. Colab CUDA, the live public tunnel and GitHub Pages publication remain to be exercised in your accounts.

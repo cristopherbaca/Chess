@@ -27,7 +27,7 @@ CELLS = json.loads((ROOT / 'vendor/deploy.ipynb').read_text())['cells']
 def cell(name):
     return ''.join(next(c['source'] for c in CELLS if c['id'] == 'phase3-' + name))
 
-def environment():
+def environment(website_origins='https://chess.example'):
     engine_module = types.ModuleType('phase3_test_engine')
     sys.modules[engine_module.__name__] = engine_module
     sources = []
@@ -45,7 +45,7 @@ def environment():
         engine = engine_module.CristopherEngine(path)
     scope = {'API_ENGINE': engine, 'API_MODULE': engine_module, 'API_VERSION': 'phase3-test-default-weights',
              'API_ENGINE_LOCK': threading.Lock(), 'API_TIME_CAPS': {'easy': 3., 'medium': 10., 'hard': 25.},
-             'threading': threading, 'time': time, 'WEBSITE_ORIGINS': 'https://chess.example',
+             'threading': threading, 'time': time, 'WEBSITE_ORIGINS': website_origins,
              'TUNNEL': 'cloudflare', 'API_ADMIN_TOKEN': 'test-only-admin-token'}
     exec(compile(cell('app'), '<phase3-app>', 'exec'), scope)
     # Core engine tests intentionally exceed public quotas; security has its own tests.

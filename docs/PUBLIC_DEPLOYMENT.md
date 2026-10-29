@@ -2,7 +2,7 @@
 
 ## Architecture and publication
 
-The browser loads only static assets from GitHub Pages and sends chess positions to a separate HTTPS API. For the existing repository the expected website is `https://cristopherbaca.github.io/Chess/`. The browser Origin is **`https://cristopherbaca.github.io`**, with no repository path. `WEBSITE_ORIGINS` in deploy.ipynb already allows this exact origin and local development on port 8080; edit it if you change domains/accounts.
+The browser loads only static assets from GitHub Pages and sends chess positions to a separate HTTPS API. For the existing repository the expected website is `https://cristopherbaca.github.io/Chess/`. The browser Origin is **`https://cristopherbaca.github.io`**, with no repository path. `WEBSITE_ORIGINS` defaults to `*`, so the API accepts requests from any website origin, including local development and non-GitHub domains. You may optionally set exact origins to restrict callers.
 
 [GitHub's Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) describes selecting Actions as the publishing source. The repository includes a **manual** `Publish Chess website` workflow. Supply the API URL from the deployment notebook. The build copies only approved frontend file types/directories into `_site/`, injects that public URL, and restricts `connect-src` to its origin. Notebook source, training modules, weights, tests, environment files and `.git` are excluded. Actions are pinned to commit hashes and the build job has read-only repository permissions; only the deployment job receives Pages/OIDC write permissions. No repository credentials are persisted by checkout.
 
@@ -14,7 +14,7 @@ The workflow is prepared, not remotely enabled or deployed. Push reviewed change
 
 | Area | Behavior |
 | --- | --- |
-| Browser origins | Exact allowlist; no wildcard or `null` origin. Allowed methods GET/POST and explicit request headers. CORS rejection occurs before model execution. |
+| Browser origins | Default `*` permits any origin, including opaque (`null`) origins, without credentialed CORS. Optional exact-origin restrictions remain available. Methods GET/POST and request headers stay explicit. |
 | Request bodies | JSON only; maximum 16 KiB, including chunked streams; five-second body-read deadline; compressed bodies rejected. |
 | Input schema | Valid six-field FEN, maximum 200 characters; at most 1,024 UCI history entries of 4–5 characters; legal history replay and matching final position; fixed difficulty choices; unknown fields rejected. |
 | Request budgets | Per client: 120 requests/minute with burst 30 and 20 move requests/minute with burst 4. Global: 600 requests/minute with burst 60 and 60 moves/minute with burst 8. Token buckets return 429 and Retry-After. |
@@ -41,7 +41,19 @@ Manifest hashes detect corruption, not an attacker who can rewrite both a truste
 
 GitHub Pages does not let this repository set arbitrary response headers. The HTML meta CSP supplies the supported restrictions; `frame-ancestors` cannot be enforced through a meta tag. The API does send framing/security headers. Dependencies installed by Colab should be kept current; no claim of zero vulnerabilities is made.
 
+## GPU population/headroom error while loading a champion
+
+Older dense exports applied their training population's GPU-memory budget to single-model deployment. This could reject a valid saved champion when the allocator already held training tensors or other GPU allocations. It does not mean the weights are damaged or the network needs retraining.
+
+Upload the current `vendor/deploy.ipynb` and run all again. It verifies the saved artifact first, then installs the corrected inference loader in memory, including for old exports; no saved weights, manifest or model files are rewritten. `API_DEVICE = 'auto'` loads one network on CUDA when available and falls back to CPU on CUDA allocation failure during loading or evaluation. Use `API_DEVICE = 'cpu'` to force CPU, or `'cuda'` to require GPU and report allocation failures. The selected device is printed during loading. A separate deployment runtime avoids competing with training for VRAM; do not interrupt or reset your training runtime just to deploy.
+
+Inference loads only the layer weights and positional prior, without population perturbations or training memory/headroom admission checks. GPU allocator-wide reserved memory is not treated as this model's memory use. Training retains its existing population guards. The updated training notebook embeds the same fix for future exports; existing exports can be served with the updated deployment notebook immediately.
+
+The local suite passes **98 tests**, including simulated CUDA OOM during loading/evaluation and loading an older failing export without modifying saved artifacts. Actual CUDA execution with your Drive weights must be verified in Colab.
+
 ## Stop, recover, inspect
+
+Once the tunnel provides its URL, public health/move checks retry every three seconds with no attempt limit until successful. Colab interruption stops retries and closes the tunnel. Initial tunnel creation/configuration failures still report their errors; this retry loop does not suppress setup errors.
 
 - Run `shutdown_api()` or disconnect the Colab runtime to stop access.
 - Rerun deployment after exporting a new champion or changing origins.

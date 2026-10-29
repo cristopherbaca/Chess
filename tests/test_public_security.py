@@ -58,6 +58,27 @@ class PublicSecurityTests(unittest.TestCase):
             'Access-Control-Request-Method': 'DELETE'})
         self.assertEqual(preflight.status_code, 400)
 
+    def test_any_origin_mode_allows_sites_and_keeps_private_stats_and_limits(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            scope = environment(website_origins='*')
+        self.addCleanup(scope['API_EXECUTOR'].shutdown, wait=True, cancel_futures=True)
+        with TestClient(scope['api']) as client:
+            for origin in ('https://another-site.example', 'http://localhost:9090', 'null'):
+                headers = {'Origin': origin}
+                self.assertEqual(client.get('/health', headers=headers).headers['access-control-allow-origin'], '*')
+                preflight = client.options('/move', headers={**headers, 'Access-Control-Request-Method': 'POST',
+                                                           'Access-Control-Request-Headers': 'content-type'})
+                self.assertEqual(preflight.status_code, 200)
+                reply = client.post('/move', json={'fen': 'bad'}, headers=headers)
+                self.assertEqual(reply.status_code, 400)
+                self.assertEqual(reply.headers['access-control-allow-origin'], '*')
+                self.assertEqual(client.get('/stats', headers=headers).status_code, 401)
+            reply = client.post('/move', content=b'x'*16385,
+                                headers={'Origin': 'https://another-site.example', 'Content-Type': 'application/json'})
+            self.assertEqual(reply.status_code, 413)
+            self.assertEqual(reply.headers['access-control-allow-origin'], '*')
+            self.assertNotIn('access-control-allow-credentials', reply.headers)
+
     def test_body_limits_content_type_and_bounded_validation(self):
         with patch.object(self.scope['API_ENGINE'], 'get_move') as engine:
             reply = self.client.post('/move', content=b'x'*16385, headers={'Content-Type': 'application/json'})
@@ -140,7 +161,8 @@ class PublicSecurityTests(unittest.TestCase):
 
     def test_origin_configuration_rejects_wildcards_paths_and_insecure_remote(self):
         self.assertEqual(allowed_origins('https://cristopherbaca.github.io/'), ('https://cristopherbaca.github.io',))
-        for value in ('*', 'https://*.github.io', 'https://cristopherbaca.github.io/Chess', 'null',
+        self.assertEqual(allowed_origins('*'), ('*',))
+        for value in ('*,https://chess.example', 'https://*.github.io', 'https://cristopherbaca.github.io/Chess', 'null',
                       'http://public.example', 'https://user:password@example.com'):
             with self.assertRaises(ValueError):
                 allowed_origins(value)

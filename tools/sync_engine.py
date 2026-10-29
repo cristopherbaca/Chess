@@ -12,7 +12,7 @@ from pathlib import Path
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ('board', 'evaluation', 'search', 'neural', 'runtime', 'matches', 'training', 'notebook_bridge',
+MODULES = ('board', 'evaluation', 'search', 'neural', 'inference', 'runtime', 'matches', 'training', 'notebook_bridge',
            'datasets', 'validation_cases', 'full_pipeline')
 BEGIN = '# BEGIN GENERATED CHESS ENGINE BUNDLE\n'
 END = '# END GENERATED CHESS ENGINE BUNDLE\n'
@@ -63,7 +63,8 @@ def sync(check=False):
         if source != updated:
             raise SystemExit('Stale notebook engine bundle. Run python tools/sync_engine.py')
         sync_security(check=True)
-        print('Notebook engine and API security bundles match canonical modules.')
+        sync_inference(check=True)
+        print('Notebook engine, inference and API security bundles match canonical modules.')
         return
     literal = ast.get_source_segment(code, assignment.value)
     assert "'''" not in updated
@@ -71,6 +72,7 @@ def sync(check=False):
     cell['source'] = code.splitlines(keepends=True)
     path.write_text(json.dumps(book, ensure_ascii=False, indent=1) + '\n')
     sync_security()
+    sync_inference()
     print('Updated standalone notebook bundle; preserved notebook outputs/settings.')
 
 
@@ -92,6 +94,29 @@ def sync_security(check=False):
     if check:
         if code != updated:
             raise SystemExit('Stale API security bundle. Run python tools/sync_engine.py')
+    else:
+        cell['source'] = updated.splitlines(keepends=True)
+        path.write_text(json.dumps(book, ensure_ascii=False, indent=1) + '\n')
+
+
+def sync_inference(check=False):
+    path = ROOT / 'vendor/deploy.ipynb'
+    book = json.loads(path.read_text())
+    cell = next(c for c in book['cells'] if c['id'] == 'phase3-load')
+    code = ''.join(cell['source'])
+    begin, end = '# BEGIN GENERATED INFERENCE SUPPORT\n', '# END GENERATED INFERENCE SUPPORT\n'
+    source = (ROOT / 'chess_ai/inference.py').read_text()
+    assert "'''" not in source
+    generated = begin + "INFERENCE_SOURCE = r'''" + source + "'''\n" + end
+    if begin in code:
+        start, stop = code.index(begin), code.index(end) + len(end)
+        updated = code[:start] + generated + code[stop:]
+    else:
+        title, rest = code.split('\n', 1)
+        updated = title + '\n' + generated + rest
+    if check:
+        if code != updated:
+            raise SystemExit('Stale inference support. Run python tools/sync_engine.py')
     else:
         cell['source'] = updated.splitlines(keepends=True)
         path.write_text(json.dumps(book, ensure_ascii=False, indent=1) + '\n')
